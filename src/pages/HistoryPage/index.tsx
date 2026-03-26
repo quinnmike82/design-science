@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { ArrowRight, Clock3, FolderGit2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -11,14 +12,14 @@ import { useReviewStore } from "@/store/useReviewStore";
 import { formatDate } from "@/utils/format";
 
 export function HistoryPage() {
-  const { sessions, results, isBootstrapped, setSessions, setResult, setCurrentReviewId } = useReviewStore((state) => ({
+  const { sessions, results, isBootstrapped, setSessions, setResult, setCurrentReviewId } = useReviewStore(useShallow((state) => ({
     sessions: state.sessions,
     results: state.results,
     isBootstrapped: state.isBootstrapped,
     setSessions: state.setSessions,
     setResult: state.setResult,
     setCurrentReviewId: state.setCurrentReviewId,
-  }));
+  })));
 
   useEffect(() => {
     reviewSessionService.listReviews().then((reviews) => {

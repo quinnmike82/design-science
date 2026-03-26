@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileStack, Layers3, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { AppShell } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/common/LoadingState";
 import { Panel } from "@/components/common/Panel";
@@ -31,7 +32,7 @@ export function WorkspacePage() {
     setCurrentRole,
     setAgentStatuses,
     setResult,
-  } = useReviewStore((state) => ({
+  } = useReviewStore(useShallow((state) => ({
     sessions: state.sessions,
     currentReviewId: state.currentReviewId,
     isBootstrapped: state.isBootstrapped,
@@ -41,7 +42,7 @@ export function WorkspacePage() {
     setCurrentRole: state.setCurrentRole,
     setAgentStatuses: state.setAgentStatuses,
     setResult: state.setResult,
-  }));
+  })));
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -51,7 +52,9 @@ export function WorkspacePage() {
   const statuses = agentStatuses[reviewId] ?? [];
 
   useEffect(() => {
-    setCurrentReviewId(reviewId);
+    if (currentReviewId !== reviewId) {
+      setCurrentReviewId(reviewId);
+    }
   }, [reviewId, setCurrentReviewId]);
 
   useEffect(() => {
@@ -105,6 +108,16 @@ export function WorkspacePage() {
     if (!session) {
       return;
     }
+
+    const hasChange = Object.entries(updates).some(([key, value]) => {
+      const sessionKey = key as keyof ReviewSession;
+      return session[sessionKey] !== value;
+    });
+
+    if (!hasChange) {
+      return;
+    }
+
     const updated = await persistSession(session, updates);
     if (updates.stakeholderRole) {
       setCurrentRole(updated.stakeholderRole);

@@ -34,6 +34,31 @@ const initialFilters: ResultsFilters = {
   sortBy: "severity",
 };
 
+function areFiltersEqual(left: ResultsFilters, right: ResultsFilters) {
+  return left.agentId === right.agentId && left.severity === right.severity && left.sortBy === right.sortBy;
+}
+
+function areStatusesEqual(left: AgentRunStatus[], right: AgentRunStatus[]) {
+  if (left === right) {
+    return true;
+  }
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => {
+    const next = right[index];
+    return (
+      item.agentId === next.agentId &&
+      item.status === next.status &&
+      item.progress === next.progress &&
+      item.startedAt === next.startedAt &&
+      item.completedAt === next.completedAt
+    );
+  });
+}
+
 export const useReviewStore = create<ReviewStoreState>((set) => ({
   sessions: {},
   currentReviewId: null,
@@ -64,13 +89,26 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
       currentReviewId: state.currentReviewId ?? session.id,
     })),
   setCurrentReviewId: (reviewId) =>
-    set((state) => ({
-      currentReviewId: reviewId,
-      currentRole: reviewId ? state.sessions[reviewId]?.stakeholderRole ?? state.currentRole : state.currentRole,
-    })),
+    set((state) => {
+      const nextRole = reviewId ? state.sessions[reviewId]?.stakeholderRole ?? state.currentRole : state.currentRole;
+
+      if (state.currentReviewId === reviewId && state.currentRole === nextRole) {
+        return state;
+      }
+
+      return {
+        currentReviewId: reviewId,
+        currentRole: nextRole,
+      };
+    }),
   setCurrentRole: (role) =>
     set((state) => {
       const currentReview = state.currentReviewId ? state.sessions[state.currentReviewId] : undefined;
+
+      if (state.currentRole === role && (!currentReview || currentReview.stakeholderRole === role)) {
+        return state;
+      }
+
       return {
         currentRole: role,
         sessions:
@@ -86,12 +124,19 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
       };
     }),
   setAgentStatuses: (reviewId, statuses) =>
-    set((state) => ({
-      agentStatuses: {
-        ...state.agentStatuses,
-        [reviewId]: statuses,
-      },
-    })),
+    set((state) => {
+      const current = state.agentStatuses[reviewId] ?? [];
+      if (areStatusesEqual(current, statuses)) {
+        return state;
+      }
+
+      return {
+        agentStatuses: {
+          ...state.agentStatuses,
+          [reviewId]: statuses,
+        },
+      };
+    }),
   setResult: (result) =>
     set((state) => ({
       results: {
@@ -99,15 +144,19 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
         [result.reviewId]: result,
       },
     })),
-  setSelectedFinding: (findingId) => set({ selectedFindingId: findingId }),
+  setSelectedFinding: (findingId) =>
+    set((state) => (state.selectedFindingId === findingId ? state : { selectedFindingId: findingId })),
   setResultsFilters: (filters) =>
-    set((state) => ({
-      resultsFilters: {
+    set((state) => {
+      const nextFilters = {
         ...state.resultsFilters,
         ...filters,
-      },
-    })),
-  resetResultsFilters: () => set({ resultsFilters: initialFilters }),
+      };
+
+      return areFiltersEqual(state.resultsFilters, nextFilters) ? state : { resultsFilters: nextFilters };
+    }),
+  resetResultsFilters: () =>
+    set((state) => (areFiltersEqual(state.resultsFilters, initialFilters) ? state : { resultsFilters: initialFilters })),
 }));
 
 export function getSelectedFinding(findings: Finding[], selectedFindingId: string | null) {

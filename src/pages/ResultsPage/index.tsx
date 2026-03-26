@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Download, Share2 } from "lucide-react";
 import { useParams } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -26,6 +27,7 @@ export function ResultsPage() {
   const {
     sessions,
     results,
+    currentReviewId,
     currentRole,
     resultsFilters,
     selectedFindingId,
@@ -36,9 +38,10 @@ export function ResultsPage() {
     setSelectedFinding,
     setResultsFilters,
     resetResultsFilters,
-  } = useReviewStore((state) => ({
+  } = useReviewStore(useShallow((state) => ({
     sessions: state.sessions,
     results: state.results,
+    currentReviewId: state.currentReviewId,
     currentRole: state.currentRole,
     resultsFilters: state.resultsFilters,
     selectedFindingId: state.selectedFindingId,
@@ -49,15 +52,18 @@ export function ResultsPage() {
     setSelectedFinding: state.setSelectedFinding,
     setResultsFilters: state.setResultsFilters,
     resetResultsFilters: state.resetResultsFilters,
-  }));
+  })));
 
   const session = sessions[reviewId];
   const result = results[reviewId];
 
   useEffect(() => {
-    setCurrentReviewId(reviewId);
+    if (currentReviewId !== reviewId) {
+      setCurrentReviewId(reviewId);
+    }
     resetResultsFilters();
-  }, [resetResultsFilters, reviewId, setCurrentReviewId]);
+    setSelectedFinding(null);
+  }, [resetResultsFilters, reviewId, setCurrentReviewId, setSelectedFinding]);
 
   useEffect(() => {
     if (!session) {
@@ -81,6 +87,10 @@ export function ResultsPage() {
   }, [result, reviewId, setResult]);
 
   const handleRoleChange = async (role: StakeholderRole) => {
+    if (role === currentRole && session?.stakeholderRole === role) {
+      return;
+    }
+
     setCurrentRole(role);
     if (!session) {
       return;
