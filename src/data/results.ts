@@ -1,4 +1,5 @@
 import { ReviewResult } from "@/types/review";
+/*
 
 export const reviewResultsSeed: ReviewResult[] = [
   {
@@ -534,3 +535,6 @@ export const reviewResultsSeed: ReviewResult[] = [
     ],
   },
 ];
+*/
+
+export const reviewResultsSeed: ReviewResult[] = [];

@@ -36,6 +36,14 @@ export function RoleAwareSummaryPanel({ result, role }: RoleAwareSummaryPanelPro
                     <div className="text-sm text-on-surface-variant">{summary.headline}</div>
                   </div>
                   <p className="text-sm leading-6 text-on-surface">{summary.summary}</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-white/10 bg-black/15 px-2.5 py-1 text-on-surface-variant">
+                      {summary.findingCount} finding{summary.findingCount === 1 ? "" : "s"}
+                    </span>
+                    <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-primary">
+                      Highest severity: {summary.highestSeverity}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap gap-2 text-xs text-on-surface-variant">
                     {summary.focusAreas.map((item) => (
                       <span key={item} className="rounded-full border border-white/10 bg-black/15 px-2.5 py-1">

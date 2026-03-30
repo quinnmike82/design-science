@@ -17,12 +17,13 @@ export function ReviewHeader({ session }: ReviewHeaderProps) {
             Review Workspace
           </div>
           <h1 className="font-display text-3xl font-bold tracking-tight text-on-surface md:text-4xl">
-            Prepare a multi-agent review run.
+            Review first, then let the AI coach you.
           </h1>
         </div>
         <p className="max-w-3xl text-sm leading-7 text-on-surface-variant">
-          Upload code changes, supporting docs, and review context. The same canonical result will later be
-          projected for engineering, QA, BA, and PM perspectives without changing the underlying data.
+          Load the backend snippet, add your own review comments, and then submit for Azure-backed evaluation and
+          specialist feedback. The same canonical result will later be projected for engineering, QA, BA, and PM
+          perspectives without changing the underlying data.
         </p>
       </div>
 

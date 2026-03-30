@@ -1,4 +1,5 @@
-import { Artifact, CreateReviewSessionPayload } from "@/types/review";
+import { CreateReviewSessionPayload } from "@/types/review";
+/*
 
 const draftArtifacts: Artifact[] = [
   {
@@ -73,4 +74,20 @@ export const defaultReviewDraft: CreateReviewSessionPayload = {
   language: "TypeScript",
   stakeholderRole: "DEV",
   artifacts: draftArtifacts,
+};
+*/
+
+export const defaultReviewDraft: CreateReviewSessionPayload = {
+  title: "Developer Coaching Session",
+  description: "Local compatibility fallback draft.",
+  projectType: "Backend Service",
+  language: "Python",
+  stakeholderRole: "DEV",
+  snippetId: "snippet_01",
+  snippetTitle: "snippet 01",
+  snippetContext: "Local compatibility fallback.",
+  snippetLanguage: "python",
+  snippetCode: "",
+  artifacts: [],
+  developerComments: [],
 };

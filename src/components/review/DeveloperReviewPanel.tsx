@@ -1,0 +1,204 @@
+import { useMemo, useState } from "react";
+import { MessageSquarePlus, Trash2 } from "lucide-react";
+import { Button } from "@/components/common/Button";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Panel } from "@/components/common/Panel";
+import { Select } from "@/components/common/Select";
+import { DeveloperComment, FindingSeverity, SnippetDetail } from "@/types/review";
+
+interface DeveloperReviewPanelProps {
+  snippet?: SnippetDetail;
+  comments: DeveloperComment[];
+  onAddComment: (comment: Omit<DeveloperComment, "id" | "createdAt">) => void;
+  onRemoveComment: (commentId: string) => void;
+}
+
+const severityOptions: Array<FindingSeverity | "unknown"> = ["unknown", "critical", "high", "medium", "low"];
+
+function buildFilePath(snippet?: SnippetDetail) {
+  if (!snippet) {
+    return "snippets/unknown.py";
+  }
+
+  const extension = snippet.language.toLowerCase() === "python" ? "py" : "txt";
+  return `snippets/${snippet.id}.${extension}`;
+}
+
+export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemoveComment }: DeveloperReviewPanelProps) {
+  const [selectedLine, setSelectedLine] = useState<number | undefined>();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [severityGuess, setSeverityGuess] = useState<FindingSeverity | "unknown">("unknown");
+
+  const lines = useMemo(() => snippet?.code.split("\n") ?? [], [snippet]);
+  const canSubmit = Boolean(snippet && title.trim() && description.trim() && selectedLine);
+  const filePath = buildFilePath(snippet);
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setSeverityGuess("unknown");
+  };
+
+  const handleAddComment = () => {
+    if (!canSubmit || !selectedLine) {
+      return;
+    }
+
+    onAddComment({
+      title: title.trim(),
+      description: description.trim(),
+      filePath,
+      lineStart: selectedLine,
+      lineEnd: selectedLine,
+      severityGuess,
+    });
+    resetForm();
+  };
+
+  return (
+    <Panel className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+            Developer review
+          </div>
+          <h2 className="font-display text-2xl font-semibold text-on-surface">Comment on lines before AI feedback</h2>
+          <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">
+            Click a line number in the backend snippet, add your own review note, and submit those comments for AI
+            evaluation. This is the structured fallback for line-level review tied to the real snippet contract.
+          </p>
+        </div>
+        <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
+          {comments.length} comment{comments.length === 1 ? "" : "s"}
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+        <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/35">
+          <div className="flex items-center justify-between border-b border-white/10 bg-surface-low/95 px-5 py-3">
+            <div>
+              <div className="text-sm font-medium text-on-surface">{snippet?.id ?? "Loading snippet..."}</div>
+              <div className="mt-1 text-xs text-on-surface-variant">
+                Click a line number to anchor your review comment.
+              </div>
+            </div>
+            {selectedLine ? (
+              <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs text-primary">
+                Selected line {selectedLine}
+              </div>
+            ) : null}
+          </div>
+          <div className="max-h-[520px] overflow-auto px-5 py-4 font-mono text-[13px] leading-7 text-on-surface scrollbar-thin">
+            {lines.map((line, index) => {
+              const lineNumber = index + 1;
+              const isSelected = selectedLine === lineNumber;
+
+              return (
+                <div
+                  key={`${snippet?.id ?? "snippet"}-${lineNumber}`}
+                  className={`grid grid-cols-[44px_1fr] gap-3 rounded-xl px-2 ${
+                    isSelected ? "bg-primary/10" : "hover:bg-white/5"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className={`select-none py-0.5 text-right text-xs ${
+                      isSelected ? "text-primary" : "text-outline hover:text-on-surface"
+                    }`}
+                    onClick={() => setSelectedLine(lineNumber)}
+                  >
+                    {lineNumber}
+                  </button>
+                  <span className="whitespace-pre-wrap break-words py-0.5 text-on-surface">{line || " "}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="mb-4 space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+                Add comment
+              </div>
+              <h3 className="font-display text-xl font-semibold text-on-surface">Structured developer finding</h3>
+            </div>
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-on-surface">
+                {selectedLine ? `Anchored to ${filePath}:${selectedLine}` : "Select a line number in the snippet viewer."}
+              </div>
+              <input
+                className="h-11 w-full rounded-xl border border-white/10 bg-surface/90 px-4 text-sm text-on-surface focus:border-primary/60"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Issue title"
+              />
+              <textarea
+                className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-surface/90 px-4 py-3 text-sm leading-6 text-on-surface focus:border-primary/60"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="Why do you think this is a problem? Add your reasoning before AI feedback."
+              />
+              <Select
+                label="Severity Guess"
+                value={severityGuess}
+                onChange={(event) => setSeverityGuess(event.target.value as FindingSeverity | "unknown")}
+              >
+                {severityOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === "unknown" ? "No guess" : option}
+                  </option>
+                ))}
+              </Select>
+              <Button className="w-full justify-center" disabled={!canSubmit} onClick={handleAddComment}>
+                <MessageSquarePlus className="size-4" />
+                Add Review Comment
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="mb-4 space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+                Your review
+              </div>
+              <h3 className="font-display text-xl font-semibold text-on-surface">Comments queued for submission</h3>
+            </div>
+            {comments.length === 0 ? (
+              <EmptyState
+                icon={<MessageSquarePlus className="size-6" />}
+                title="No developer comments yet"
+                description="Select a line in the code viewer and add your first structured review finding."
+              />
+            ) : (
+              <div className="space-y-3">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="rounded-2xl border border-white/10 bg-black/15 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2">
+                        <div className="font-medium text-on-surface">{comment.title}</div>
+                        <div className="text-xs text-on-surface-variant">
+                          {comment.filePath}
+                          {comment.lineStart ? `:${comment.lineStart}` : ""}
+                          {comment.severityGuess && comment.severityGuess !== "unknown"
+                            ? ` · ${comment.severityGuess}`
+                            : ""}
+                        </div>
+                        <p className="text-sm leading-6 text-on-surface-variant">{comment.description}</p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => onRemoveComment(comment.id)}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}

@@ -3,7 +3,7 @@ import { Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Panel } from "@/components/common/Panel";
 import { ChatMessage, ReviewResult, StakeholderRole } from "@/types/review";
-import { createId } from "@/services/mock/helpers";
+import { createId } from "@/utils/id";
 
 const prompts = [
   "Explain this for PM",
@@ -42,7 +42,7 @@ export function FollowUpChatPanel({ result, role }: FollowUpChatPanelProps) {
     {
       id: createId("chat"),
       role: "assistant",
-      content: "Ask for a tailored summary, release blockers, or suggested follow-up work. Responses stay mock-only but respect the selected stakeholder perspective.",
+      content: "Ask for a tailored summary, release blockers, or suggested follow-up work. This local assistant rephrases the current review result for the selected stakeholder perspective.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -80,7 +80,7 @@ export function FollowUpChatPanel({ result, role }: FollowUpChatPanelProps) {
         </div>
         <div>
           <div className="font-display text-lg font-semibold text-on-surface">Follow-up Assistant</div>
-          <div className="text-sm text-on-surface-variant">Mock-only post-review conversation surface</div>
+          <div className="text-sm text-on-surface-variant">Local post-review conversation surface</div>
         </div>
       </div>
 

@@ -64,8 +64,8 @@ export function ArtifactUploadPanel({
           <div className="space-y-2">
             <h3 className="font-display text-xl font-semibold text-on-surface">Upload review artifacts</h3>
             <p className="max-w-md text-sm leading-6 text-on-surface-variant">
-              Drop changed files, patch files, specs, tests, or notes here. Files stay in the frontend mock layer
-              and are modeled through the same service interface a future backend will replace.
+              Drop changed files, patch files, specs, tests, or notes here. These artifacts stay local to the
+              workspace today because the Azure backend does not yet expose artifact upload endpoints.
             </p>
           </div>
         </div>
@@ -90,7 +90,7 @@ export function ArtifactUploadPanel({
             </Button>
             <Button variant="outline" disabled>
               <FileText className="size-4" />
-              Mock Storage Boundary
+              Local Workspace Storage
             </Button>
           </div>
         </div>

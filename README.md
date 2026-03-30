@@ -7,7 +7,7 @@ Frontend-only mock application for an agentic code review product. The app recre
 - Results dashboard
 - Review history
 
-It is intentionally structured so the current mock services can be replaced by real backend clients later without rewriting the presentation layer.
+It started as a mock frontend and is now wired to the real Azure-backed Coding Coach API for snippet loading, developer-review evaluation, and AI review results, while keeping local-only fallbacks for unsupported backend capabilities such as artifact upload persistence and review history.
 
 ## Stack
 
@@ -26,13 +26,21 @@ It is intentionally structured so the current mock services can be replaced by r
 npm install
 ```
 
-2. Start the dev server:
+2. Point the app at the backend:
+
+```bash
+copy .env.example .env
+```
+
+By default the frontend uses `http://localhost:8000` via `VITE_API_BASE_URL`.
+
+3. Start the dev server:
 
 ```bash
 npm run dev
 ```
 
-3. Build for production:
+4. Build for production:
 
 ```bash
 npm run build
@@ -60,20 +68,23 @@ src/
   utils/                  formatting, artifact helpers, class helpers
 ```
 
-## Mock service replacement plan
+## Backend integration
 
-The current backend boundary is already isolated in `src/services/mock/`.
+Real backend calls now live under `src/services/api/` and the main orchestration layer lives in `src/services/`.
 
-- `reviewSessionService.ts`
-  Replace with real `GET /reviews`, `GET /reviews/:id`, `POST /reviews`, `PATCH /reviews/:id`.
-- `artifactService.ts`
-  Replace with real artifact upload and delete endpoints.
-- `reviewRunService.ts`
-  Replace with real run trigger + polling, SSE, or websocket orchestration.
-- `db.ts`
-  Delete once real HTTP clients become the source of truth.
+- Real API usage:
+  - `GET /snippets`
+  - `GET /snippets/:id`
+  - `POST /api/analytics/start`
+  - `POST /api/analytics/evaluate`
+  - `POST /review/monolithic`
+  - `POST /review/specialist`
+- Local-only fallback usage:
+  - artifact upload/paste state in the workspace
+  - persisted frontend review history
+  - follow-up assistant prompt rewriting
 
-The UI pages and components should continue to call the same service functions, so the migration stays localized.
+The UI still talks to a centralized service layer, so future backend expansion should stay localized.
 
 ## Stakeholder role logic
 
@@ -92,13 +103,10 @@ The same canonical `ReviewResult` drives all four perspectives:
 
 Switching roles does not require a refetch. The presentation layer transforms the same result model in place.
 
-## Seeded demo flow
+## Current workflow
 
-Use `rev-synth-001` to test the primary experience:
-
-- workspace artifacts already loaded
-- stakeholder role dropdown on workspace and results
-- mock multi-agent run with status progression
-- results dashboard with role-aware finding rendering
-
-Additional seeded reviews are included for history and alternate result navigation.
+1. Load a backend snippet from the workspace
+2. Add developer review comments tied to specific lines
+3. Submit the review for evaluation + AI feedback
+4. Inspect the role-aware results dashboard with accordion finding cards
+5. Re-open completed runs from the local history page

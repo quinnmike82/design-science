@@ -1,4 +1,5 @@
 import { ReviewSession } from "@/types/review";
+/*
 
 export const reviewSessionsSeed: ReviewSession[] = [
   {
@@ -117,3 +118,6 @@ Recent incidents:
     ],
   },
 ];
+*/
+
+export const reviewSessionsSeed: ReviewSession[] = [];

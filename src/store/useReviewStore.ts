@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import {
   AgentRunStatus,
-  Finding,
   ResultsFilters,
   ReviewResult,
   ReviewSession,
@@ -14,7 +13,6 @@ interface ReviewStoreState {
   currentRole: StakeholderRole;
   agentStatuses: Record<string, AgentRunStatus[]>;
   results: Record<string, ReviewResult>;
-  selectedFindingId: string | null;
   resultsFilters: ResultsFilters;
   isBootstrapped: boolean;
   setSessions: (sessions: ReviewSession[]) => void;
@@ -23,7 +21,6 @@ interface ReviewStoreState {
   setCurrentRole: (role: StakeholderRole) => void;
   setAgentStatuses: (reviewId: string, statuses: AgentRunStatus[]) => void;
   setResult: (result: ReviewResult) => void;
-  setSelectedFinding: (findingId: string | null) => void;
   setResultsFilters: (filters: Partial<ResultsFilters>) => void;
   resetResultsFilters: () => void;
 }
@@ -31,11 +28,19 @@ interface ReviewStoreState {
 const initialFilters: ResultsFilters = {
   agentId: "all",
   severity: "all",
+  filePath: "all",
+  developerFoundStatus: "all",
   sortBy: "severity",
 };
 
 function areFiltersEqual(left: ResultsFilters, right: ResultsFilters) {
-  return left.agentId === right.agentId && left.severity === right.severity && left.sortBy === right.sortBy;
+  return (
+    left.agentId === right.agentId &&
+    left.severity === right.severity &&
+    left.filePath === right.filePath &&
+    left.developerFoundStatus === right.developerFoundStatus &&
+    left.sortBy === right.sortBy
+  );
 }
 
 function areStatusesEqual(left: AgentRunStatus[], right: AgentRunStatus[]) {
@@ -65,7 +70,6 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
   currentRole: "DEV",
   agentStatuses: {},
   results: {},
-  selectedFindingId: null,
   resultsFilters: initialFilters,
   isBootstrapped: false,
   setSessions: (sessions) =>
@@ -144,8 +148,6 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
         [result.reviewId]: result,
       },
     })),
-  setSelectedFinding: (findingId) =>
-    set((state) => (state.selectedFindingId === findingId ? state : { selectedFindingId: findingId })),
   setResultsFilters: (filters) =>
     set((state) => {
       const nextFilters = {
@@ -158,7 +160,3 @@ export const useReviewStore = create<ReviewStoreState>((set) => ({
   resetResultsFilters: () =>
     set((state) => (areFiltersEqual(state.resultsFilters, initialFilters) ? state : { resultsFilters: initialFilters })),
 }));
-
-export function getSelectedFinding(findings: Finding[], selectedFindingId: string | null) {
-  return findings.find((finding) => finding.id === selectedFindingId) ?? null;
-}

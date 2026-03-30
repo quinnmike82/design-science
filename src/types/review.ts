@@ -20,6 +20,9 @@ export type LanguageOption =
   | "Java"
   | "Kotlin";
 
+export type ReviewMode = "monolithic" | "specialist";
+export type ReviewCondition = "monolithic" | "specialist";
+
 export interface Artifact {
   id: string;
   type: ArtifactType;
@@ -30,8 +33,35 @@ export interface Artifact {
   uploadedAt: string;
 }
 
+export interface SnippetSummary {
+  id: string;
+  label: string;
+  language: string;
+  context: string;
+  numSeededIssues: number;
+}
+
+export interface SnippetDetail extends SnippetSummary {
+  code: string;
+}
+
+export type FindingSeverity = "critical" | "high" | "medium" | "low";
+export type FindingConfidence = "high" | "medium" | "low";
+
+export interface DeveloperComment {
+  id: string;
+  title: string;
+  description: string;
+  filePath: string;
+  lineStart?: number;
+  lineEnd?: number;
+  severityGuess?: FindingSeverity | "unknown";
+  createdAt: string;
+}
+
 export interface ReviewSession {
   id: string;
+  backendSessionId?: string;
   title: string;
   description: string;
   projectType: ProjectType;
@@ -40,12 +70,24 @@ export interface ReviewSession {
   createdAt: string;
   status: ReviewStatus;
   artifacts: Artifact[];
+  snippetId: string;
+  snippetTitle: string;
+  snippetContext: string;
+  snippetLanguage: string;
+  snippetCode: string;
+  developerComments: DeveloperComment[];
+  reviewStartedAt?: string;
+  submittedAt?: string;
+  timeSpentSec?: number;
+  reviewMode: ReviewMode;
+  analyticsCondition?: ReviewCondition;
 }
 
 export type AgentIconName = "shield" | "network" | "brain" | "sparkles" | "flask" | "scale";
+export type AgentId = "security" | "architecture" | "logic" | "maintainability" | "testing" | "policy" | "general";
 
 export interface AgentDefinition {
-  id: string;
+  id: AgentId;
   name: string;
   category: string;
   description: string;
@@ -54,19 +96,18 @@ export interface AgentDefinition {
 }
 
 export interface AgentRunStatus {
-  agentId: string;
+  agentId: AgentId;
   status: "idle" | "queued" | "running" | "completed" | "failed";
   progress: number;
   startedAt?: string;
   completedAt?: string;
 }
 
-export type FindingSeverity = "critical" | "high" | "medium" | "low";
-export type FindingConfidence = "high" | "medium" | "low";
+export type DeveloperFindingStatus = "found" | "missed" | "unknown";
 
 export interface Finding {
   id: string;
-  agentId: string;
+  agentId: AgentId;
   severity: FindingSeverity;
   confidence: FindingConfidence;
   category: string;
@@ -80,18 +121,23 @@ export interface Finding {
   lineStart?: number;
   lineEnd?: number;
   recommendation: string;
-  suggestedDiff?: string;
+  suggestedFix?: string;
+  evidence?: string;
   suggestedTestCases: string[];
   tags: string[];
   relatedArtifacts: string[];
   affectedFeature?: string;
+  developerFoundStatus: DeveloperFindingStatus;
+  relatedCommentIds: string[];
 }
 
 export interface AgentSummary {
-  agentId: string;
+  agentId: AgentId;
   headline: string;
   summary: string;
   focusAreas: string[];
+  findingCount: number;
+  highestSeverity: FindingSeverity;
 }
 
 export interface SeverityCounts {
@@ -101,15 +147,42 @@ export interface SeverityCounts {
   low: number;
 }
 
+export interface ReviewMetrics {
+  recallScore?: number;
+  falsePositiveRate?: number;
+  truePositives?: number;
+  falsePositives?: number;
+  totalGroundTruth?: number;
+  timeSpentSec?: number;
+  latencyMs?: number;
+  deltaScore?: number;
+  condition?: ReviewCondition;
+}
+
+export interface ReviewCoaching {
+  caught: DeveloperComment[];
+  missed: Finding[];
+  falsePositives: DeveloperComment[];
+  summary: string;
+  evaluatorMessage?: string;
+}
+
 export interface ReviewResult {
   reviewId: string;
+  sessionId?: string;
+  mode: ReviewMode;
   executiveSummary: string;
+  mergedSummary: string;
   releaseRecommendation: "Hold Release" | "Proceed with Caution" | "Ready with Follow-up";
   estimatedFixEffort: string;
   overallRisk: "Severe" | "Elevated" | "Moderate" | "Contained";
   severityCounts: SeverityCounts;
   findings: Finding[];
   agentSummaries: AgentSummary[];
+  metrics: ReviewMetrics;
+  recommendedActions: string[];
+  developerComments: DeveloperComment[];
+  coaching: ReviewCoaching;
 }
 
 export interface CreateReviewSessionPayload {
@@ -118,24 +191,58 @@ export interface CreateReviewSessionPayload {
   projectType: ProjectType;
   language: LanguageOption;
   stakeholderRole: StakeholderRole;
+  snippetId: string;
+  snippetTitle: string;
+  snippetContext: string;
+  snippetLanguage: string;
+  snippetCode: string;
+  reviewMode?: ReviewMode;
   artifacts?: Artifact[];
+  developerComments?: DeveloperComment[];
+  reviewStartedAt?: string;
 }
 
 export type UpdateReviewSessionPayload = Partial<
-  Pick<ReviewSession, "title" | "description" | "projectType" | "language" | "stakeholderRole" | "status">
+  Pick<
+    ReviewSession,
+    | "title"
+    | "description"
+    | "projectType"
+    | "language"
+    | "stakeholderRole"
+    | "status"
+    | "snippetId"
+    | "snippetTitle"
+    | "snippetContext"
+    | "snippetLanguage"
+    | "snippetCode"
+    | "developerComments"
+    | "reviewStartedAt"
+    | "submittedAt"
+    | "timeSpentSec"
+    | "reviewMode"
+    | "analyticsCondition"
+    | "backendSessionId"
+  >
 > & {
   artifacts?: Artifact[];
 };
 
+export interface RoleFindingSection {
+  label: string;
+  content: string;
+}
+
 export interface RoleBasedFindingView {
   headline: string;
-  body: string;
+  summary: string;
   emphasisLabel: string;
   emphasisValue: string;
   secondaryLabel: string;
   secondaryValue: string;
   recommendationLabel: string;
   recommendation: string;
+  detailSections: RoleFindingSection[];
 }
 
 export interface RoleBasedSummary {
@@ -145,11 +252,13 @@ export interface RoleBasedSummary {
   callout: string;
 }
 
-export type FindingSortOption = "severity" | "confidence" | "agent" | "filePath";
+export type FindingSortOption = "severity" | "confidence" | "agent" | "filePath" | "line" | "missedFirst";
 
 export interface ResultsFilters {
-  agentId: "all" | AgentDefinition["id"];
+  agentId: "all" | AgentId;
   severity: "all" | FindingSeverity;
+  filePath: "all" | string;
+  developerFoundStatus: "all" | DeveloperFindingStatus;
   sortBy: FindingSortOption;
 }
 

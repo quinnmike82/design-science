@@ -1,30 +1,31 @@
 import { SlidersHorizontal } from "lucide-react";
-import { agentDefinitions } from "@/data/agents";
 import { Button } from "@/components/common/Button";
 import { Select } from "@/components/common/Select";
-import { ResultsFilters } from "@/types/review";
+import { AgentId, ResultsFilters } from "@/types/review";
 
 interface AgentFilterBarProps {
   filters: ResultsFilters;
+  agents: Array<{ id: AgentId; name: string }>;
+  fileOptions: string[];
   onFiltersChange: (filters: Partial<ResultsFilters>) => void;
   onReset: () => void;
 }
 
-export function AgentFilterBar({ filters, onFiltersChange, onReset }: AgentFilterBarProps) {
+export function AgentFilterBar({ filters, agents, fileOptions, onFiltersChange, onReset }: AgentFilterBarProps) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
       <div className="mb-4 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
         <SlidersHorizontal className="size-4" />
         Findings filters
       </div>
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
         <Select
           label="Agent"
           value={filters.agentId}
           onChange={(event) => onFiltersChange({ agentId: event.target.value as ResultsFilters["agentId"] })}
         >
           <option value="all">All agents</option>
-          {agentDefinitions.map((agent) => (
+          {agents.map((agent) => (
             <option key={agent.id} value={agent.id}>
               {agent.name}
             </option>
@@ -42,6 +43,32 @@ export function AgentFilterBar({ filters, onFiltersChange, onReset }: AgentFilte
           <option value="low">Low</option>
         </Select>
         <Select
+          label="File"
+          value={filters.filePath}
+          onChange={(event) => onFiltersChange({ filePath: event.target.value })}
+        >
+          <option value="all">All files</option>
+          {fileOptions.map((filePath) => (
+            <option key={filePath} value={filePath}>
+              {filePath}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Developer Match"
+          value={filters.developerFoundStatus}
+          onChange={(event) =>
+            onFiltersChange({
+              developerFoundStatus: event.target.value as ResultsFilters["developerFoundStatus"],
+            })
+          }
+        >
+          <option value="all">All findings</option>
+          <option value="missed">Missed by developer</option>
+          <option value="found">Already found by developer</option>
+          <option value="unknown">Unknown match</option>
+        </Select>
+        <Select
           label="Sort"
           value={filters.sortBy}
           onChange={(event) => onFiltersChange({ sortBy: event.target.value as ResultsFilters["sortBy"] })}
@@ -50,6 +77,8 @@ export function AgentFilterBar({ filters, onFiltersChange, onReset }: AgentFilte
           <option value="confidence">Confidence desc</option>
           <option value="agent">Agent</option>
           <option value="filePath">File path</option>
+          <option value="line">Line number</option>
+          <option value="missedFirst">Missed first</option>
         </Select>
         <div className="flex items-end">
           <Button variant="outline" className="w-full justify-center lg:w-auto" onClick={onReset}>

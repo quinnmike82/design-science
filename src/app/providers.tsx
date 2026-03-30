@@ -1,5 +1,5 @@
 import { PropsWithChildren, useEffect } from "react";
-import { reviewSessionService } from "@/services/mock/reviewSessionService";
+import { reviewSessionService } from "@/services/reviewSessionService";
 import { useReviewStore } from "@/store/useReviewStore";
 
 export function AppProviders({ children }: PropsWithChildren) {

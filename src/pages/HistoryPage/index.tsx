@@ -6,8 +6,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
 import { LoadingState } from "@/components/common/LoadingState";
 import { Panel } from "@/components/common/Panel";
-import { reviewRunService } from "@/services/mock/reviewRunService";
-import { reviewSessionService } from "@/services/mock/reviewSessionService";
+import { reviewRunService } from "@/services/reviewRunService";
+import { reviewSessionService } from "@/services/reviewSessionService";
 import { useReviewStore } from "@/store/useReviewStore";
 import { formatDate } from "@/utils/format";
 
@@ -62,10 +62,11 @@ export function HistoryPage() {
       <div className="mx-auto max-w-[1400px] space-y-8">
         <div className="space-y-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Review history</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Previous synthetic review sessions</h1>
+          <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Previous coaching sessions</h1>
           <p className="max-w-3xl text-sm leading-7 text-on-surface-variant">
-            Inspect the seeded mock sessions, their current status, and the risk posture captured by the review result
-            model. This page is intentionally structured like a future API-backed review index.
+            Inspect locally persisted sessions, their current status, and the normalized coaching result captured from
+            the Azure-backed workflow. This page persists frontend session state because the current backend does not
+            expose a review-history index yet.
           </p>
         </div>
 

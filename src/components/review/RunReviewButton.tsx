@@ -16,7 +16,7 @@ export function RunReviewButton({ disabled, loading, onClick }: RunReviewButtonP
       onClick={onClick}
     >
       {loading ? <Sparkles className="size-4 animate-pulseSoft" /> : <ArrowRight className="size-4" />}
-      {loading ? "Running Multi-Agent Review..." : "Run Multi-Agent Review"}
+      {loading ? "Evaluating Your Review..." : "Submit My Review"}
     </Button>
   );
 }

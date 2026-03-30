@@ -1,7 +1,7 @@
 import { ChangeEvent } from "react";
 import { Select } from "@/components/common/Select";
 import { StakeholderRoleSelect } from "@/components/review/StakeholderRoleSelect";
-import { LanguageOption, ProjectType, ReviewSession, StakeholderRole } from "@/types/review";
+import { LanguageOption, ProjectType, ReviewMode, ReviewSession, StakeholderRole } from "@/types/review";
 
 const languages: LanguageOption[] = ["TypeScript", "JavaScript", "Python", "Go", "Java", "Kotlin"];
 const projectTypes: ProjectType[] = [
@@ -19,6 +19,7 @@ interface ProjectMetaFormProps {
   onLanguageChange: (language: LanguageOption) => void;
   onProjectTypeChange: (projectType: ProjectType) => void;
   onRoleChange: (role: StakeholderRole) => void;
+  onReviewModeChange: (mode: ReviewMode) => void;
 }
 
 export function ProjectMetaForm({
@@ -27,6 +28,7 @@ export function ProjectMetaForm({
   onLanguageChange,
   onProjectTypeChange,
   onRoleChange,
+  onReviewModeChange,
 }: ProjectMetaFormProps) {
   const handleTextChange =
     (field: "title" | "description") => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -58,7 +60,7 @@ export function ProjectMetaForm({
         </label>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4">
         <Select
           label="Language"
           value={session.language}
@@ -82,6 +84,15 @@ export function ProjectMetaForm({
           ))}
         </Select>
         <StakeholderRoleSelect value={session.stakeholderRole} onChange={onRoleChange} />
+        <Select
+          label="Review Mode"
+          helperText="Use the real Azure specialist flow by default. Monolithic is available for baseline comparison."
+          value={session.reviewMode}
+          onChange={(event) => onReviewModeChange(event.target.value as ReviewMode)}
+        >
+          <option value="specialist">Multi-agent coaching</option>
+          <option value="monolithic">Monolithic baseline</option>
+        </Select>
       </div>
     </div>
   );
