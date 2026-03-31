@@ -1,54 +1,47 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BarChart3, Code2, History, Plus, Sparkles } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
-import { reviewSessionService } from "@/services/reviewSessionService";
-import { useReviewStore } from "@/store/useReviewStore";
+import { createReviewDraft, getLatestReviewRun } from "@/services/review.service";
 import { cn } from "@/utils/cn";
-
-const items = [
-  {
-    label: "Workspace",
-    to: "/workspace",
-    icon: Code2,
-  },
-  {
-    label: "Results",
-    to: "/results/rev-synth-001",
-    icon: BarChart3,
-  },
-  {
-    label: "History",
-    to: "/history",
-    icon: History,
-  },
-];
 
 export function SideNav() {
   const navigate = useNavigate();
-  const { currentReviewId, sessions, upsertSession, setCurrentReviewId } = useReviewStore((state) => ({
-    currentReviewId: state.currentReviewId,
-    sessions: state.sessions,
-    upsertSession: state.upsertSession,
-    setCurrentReviewId: state.setCurrentReviewId,
-  }));
+  const location = useLocation();
   const [isCreatingReview, setIsCreatingReview] = useState(false);
-  const resultLink = currentReviewId ? `/results/${currentReviewId}` : "/results/rev-synth-001";
-  const currentSession = currentReviewId ? sessions[currentReviewId] : undefined;
-  const kernelCopy =
-    currentSession?.reviewMode === "monolithic"
-      ? "Monolithic mode keeps the same workflow but hides the specialist roster and runs one baseline reviewer."
-      : "Specialist mode runs six focused reviewers and merges the output into one stakeholder-ready result.";
+  const latestRunId = getLatestReviewRun()?.id;
+  const resultLink = latestRunId ? `/results/${latestRunId}` : "/workspace";
+
+  const items = useMemo(
+    () => [
+      {
+        label: "Workspace",
+        to: "/workspace",
+        icon: Code2,
+      },
+      {
+        label: "Results",
+        to: resultLink,
+        icon: BarChart3,
+      },
+      {
+        label: "History",
+        to: "/history",
+        icon: History,
+      },
+    ],
+    [resultLink],
+  );
+
+  const kernelCopy = latestRunId
+    ? "The latest review run stays available in the shared 3-step flow, so summary and marker review stay connected."
+    : "Create a review run to populate the shared 3-step input, summary, and marker review workflow.";
 
   const handleCreateFreshReview = async () => {
     setIsCreatingReview(true);
     try {
-      const freshSession = await reviewSessionService.createFreshReviewSession(currentSession);
-      upsertSession(freshSession);
-      setCurrentReviewId(freshSession.id);
-      navigate("/workspace");
-    } catch (error) {
-      console.error("Failed to create a fresh review session.", error);
+      const run = createReviewDraft();
+      navigate(`/workspace?reviewId=${run.id}`);
     } finally {
       setIsCreatingReview(false);
     }
@@ -62,7 +55,7 @@ export function SideNav() {
         </div>
         <div>
           <div className="font-display text-lg font-semibold text-on-surface">Agentic Review</div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/70">V2.4 Stable</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/70">3-Step Flow</div>
         </div>
       </div>
 
@@ -73,16 +66,16 @@ export function SideNav() {
 
       <nav className="space-y-2">
         {items.map((item) => {
-          const target = item.label === "Results" ? resultLink : item.to;
           const Icon = item.icon;
           return (
             <NavLink
               key={item.label}
-              to={target}
+              to={item.to}
               className={({ isActive }) =>
                 cn(
                   "flex items-center gap-3 rounded-2xl border border-transparent px-4 py-3 text-sm font-medium text-on-surface-variant transition-all hover:border-white/10 hover:bg-surface hover:text-secondary",
-                  isActive && "border-primary/25 bg-surface-variant text-primary",
+                  (isActive || (item.label === "Results" && location.pathname.startsWith("/results/"))) &&
+                    "border-primary/25 bg-surface-variant text-primary",
                 )
               }
             >

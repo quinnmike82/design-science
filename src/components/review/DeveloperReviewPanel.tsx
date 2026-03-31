@@ -144,6 +144,7 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
                 >
                   <button
                     type="button"
+                    aria-label={`Select line ${lineNumber}`}
                     className={`select-none py-0.5 text-right text-xs ${
                       isSelected ? "text-primary" : "text-outline hover:text-on-surface"
                     } ${isBoundary ? "font-semibold" : ""}`}

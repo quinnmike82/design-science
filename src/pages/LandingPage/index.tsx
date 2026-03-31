@@ -5,6 +5,7 @@ import { Button } from "@/components/common/Button";
 import { Panel } from "@/components/common/Panel";
 import { agentDefinitions } from "@/data/agents";
 import { AgentIcon } from "@/components/common/AgentIcon";
+import { getLatestReviewRun } from "@/services/review.service";
 
 const trustPoints = [
   "Security, architecture, logic, maintainability, testing, and policy agents operate as one review system.",
@@ -34,6 +35,9 @@ const testimonials = [
 ];
 
 export function LandingPage() {
+  const latestRunId = getLatestReviewRun()?.id;
+  const resultLink = latestRunId ? `/results/${latestRunId}` : "/workspace";
+
   return (
     <AppShell className="px-0 pt-16">
       <section className="relative overflow-hidden bg-hero px-5 pb-20 pt-20 md:px-8 md:pb-28 md:pt-28">
@@ -61,7 +65,7 @@ export function LandingPage() {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                <Link to="/results/rev-synth-001">View Results Demo</Link>
+                <Link to={resultLink}>View Latest Results</Link>
               </Button>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
@@ -238,11 +242,10 @@ export function LandingPage() {
         <Panel highlighted className="space-y-6 px-6 py-10 md:px-10 md:py-14">
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Start The Demo</div>
           <h2 className="font-display text-4xl font-bold tracking-tight text-on-surface md:text-5xl">
-            Launch the review workspace and run the six-agent flow.
+            Launch the review workspace and run the 3-step review flow.
           </h2>
           <p className="mx-auto max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Use the seeded checkout review to inspect artifacts, switch stakeholder roles, run the mock orchestration,
-            and explore the results dashboard.
+            Upload review input, inspect the structured summary, then move into the marker review experience with inline feedback and a lightweight survey.
           </p>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild size="lg" className="w-full sm:w-auto">

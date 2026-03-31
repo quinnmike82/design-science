@@ -1,132 +1,91 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { ArrowRight, Clock3, FolderGit2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/common/Button";
-import { LoadingState } from "@/components/common/LoadingState";
+import { EmptyState } from "@/components/common/EmptyState";
 import { Panel } from "@/components/common/Panel";
-import { reviewRunService } from "@/services/reviewRunService";
-import { reviewSessionService } from "@/services/reviewSessionService";
-import { useReviewStore } from "@/store/useReviewStore";
+import { listReviewRuns } from "@/services/review.service";
 import { formatDate } from "@/utils/format";
 
 export function HistoryPage() {
-  const { sessions, results, isBootstrapped, setSessions, setResult, setCurrentReviewId } = useReviewStore(useShallow((state) => ({
-    sessions: state.sessions,
-    results: state.results,
-    isBootstrapped: state.isBootstrapped,
-    setSessions: state.setSessions,
-    setResult: state.setResult,
-    setCurrentReviewId: state.setCurrentReviewId,
-  })));
-
-  useEffect(() => {
-    reviewSessionService.listReviews().then((reviews) => {
-      setSessions(reviews);
-    });
-  }, [setSessions]);
-
-  useEffect(() => {
-    const reviewIds = Object.keys(sessions);
-    if (!reviewIds.length) {
-      return;
-    }
-    Promise.all(reviewIds.map((reviewId) => reviewRunService.getReviewResult(reviewId))).then((items) => {
-      items.filter(Boolean).forEach((item) => {
-        if (item) {
-          setResult(item);
-        }
-      });
-    });
-  }, [sessions, setResult]);
-
-  const orderedSessions = useMemo(
-    () =>
-      Object.values(sessions).sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1)),
-    [sessions],
-  );
-
-  if (!isBootstrapped && orderedSessions.length === 0) {
-    return (
-      <AppShell withSidebar>
-        <div className="mx-auto max-w-[1400px]">
-          <LoadingState title="Loading review history" />
-        </div>
-      </AppShell>
-    );
-  }
+  const runs = useMemo(() => listReviewRuns(), []);
 
   return (
     <AppShell withSidebar>
       <div className="mx-auto max-w-[1400px] space-y-8">
         <div className="space-y-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Review history</div>
-          <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Previous coaching sessions</h1>
+          <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Previous review runs</h1>
           <p className="max-w-3xl text-sm leading-7 text-on-surface-variant">
-            Inspect locally persisted sessions, their current status, and the normalized coaching result captured from
-            the Azure-backed workflow. This page persists frontend session state because the current backend does not
-            expose a review-history index yet.
+            Open a saved review run in the shared 3-step flow. History is currently persisted on the frontend so the experience stays usable while backend run indexing is still in progress.
           </p>
         </div>
 
-        <div className="space-y-4">
-          {orderedSessions.map((session) => {
-            const result = results[session.id];
-            return (
-              <Panel key={session.id} className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        {runs.length === 0 ? (
+          <EmptyState
+            icon={<FolderGit2 className="size-6" />}
+            title="No review history yet"
+            description="Create a review run from the workspace to start building history."
+          />
+        ) : (
+          <div className="space-y-4">
+            {runs.map((run) => (
+              <Panel key={run.id} className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                 <div className="grid gap-4 xl:flex-1 xl:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,0.55fr))] xl:items-center">
                   <div className="space-y-2">
-                    <div className="font-display text-2xl font-semibold text-on-surface">{session.title}</div>
-                    <p className="text-sm leading-6 text-on-surface-variant">{session.description}</p>
+                    <div className="font-display text-2xl font-semibold text-on-surface">
+                      {run.input.mainFiles[0]?.name ?? "Untitled review run"}
+                    </div>
+                    <p className="text-sm leading-6 text-on-surface-variant">
+                      {run.result?.summaryText ?? "Draft review input. Submit the run to generate findings."}
+                    </p>
                   </div>
 
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Status</div>
                     <div className="mt-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-on-surface">
-                      {session.status}
+                      {run.status}
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Created</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Updated</div>
                     <div className="mt-2 flex items-center gap-2 text-sm text-on-surface">
                       <Clock3 className="size-4 text-secondary" />
-                      {formatDate(session.createdAt)}
+                      {formatDate(run.updatedAt)}
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Project</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Mode</div>
                     <div className="mt-2 flex items-center gap-2 text-sm text-on-surface">
                       <FolderGit2 className="size-4 text-primary" />
-                      {session.projectType}
+                      {run.input.reviewMode === "multiple_agent" ? "Multiple Agent" : run.input.reviewMode === "mono" ? "Mono" : "Unselected"}
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Risk</div>
-                    <div className="mt-2 text-sm text-on-surface">{result?.overallRisk ?? "Pending result"}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Issues</div>
+                    <div className="mt-2 text-sm text-on-surface">{run.result?.issues.length ?? 0}</div>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3 xl:shrink-0">
                   <Button asChild variant="outline">
-                    <Link to="/workspace" onClick={() => setCurrentReviewId(session.id)}>
-                      Open workspace
-                    </Link>
+                    <Link to={`/workspace?reviewId=${run.id}`}>Open workspace</Link>
                   </Button>
                   <Button asChild>
-                    <Link to={`/results/${session.id}`} onClick={() => setCurrentReviewId(session.id)}>
+                    <Link to={`/results/${run.id}`}>
                       Open results
                       <ArrowRight className="size-4" />
                     </Link>
                   </Button>
                 </div>
               </Panel>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </AppShell>
   );
