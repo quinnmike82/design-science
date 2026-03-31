@@ -1,6 +1,6 @@
 import { SearchX } from "lucide-react";
 import { Button } from "@/components/common/Button";
-import { DeveloperComment, Finding, StakeholderRole } from "@/types/review";
+import { DeveloperComment, Finding, FindingReport, IssueReportReason, StakeholderRole } from "@/types/review";
 import { FindingCard } from "@/components/results/FindingCard";
 import { EmptyState } from "@/components/common/EmptyState";
 
@@ -8,20 +8,30 @@ interface FindingsListProps {
   findings: Finding[];
   role: StakeholderRole;
   developerComments: DeveloperComment[];
+  reports: FindingReport[];
+  canReport: boolean;
+  reportingFindingId?: string | null;
+  reportDisabledReason?: string;
   expandedIds: string[];
   onToggle: (findingId: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  onSubmitReport: (finding: Finding, payload: { reason: IssueReportReason; details: string }) => Promise<void>;
 }
 
 export function FindingsList({
   findings,
   role,
   developerComments,
+  reports,
+  canReport,
+  reportingFindingId,
+  reportDisabledReason,
   expandedIds,
   onToggle,
   onExpandAll,
   onCollapseAll,
+  onSubmitReport,
 }: FindingsListProps) {
   if (findings.length === 0) {
     return (
@@ -60,7 +70,12 @@ export function FindingsList({
           role={role}
           expanded={expandedIds.includes(finding.id)}
           relatedComments={developerComments.filter((comment) => finding.relatedCommentIds.includes(comment.id))}
+          report={reports.find((report) => report.findingId === finding.id)}
+          canReport={canReport}
+          isReporting={reportingFindingId === finding.id}
+          reportDisabledReason={reportDisabledReason}
           onToggle={onToggle}
+          onSubmitReport={(payload) => onSubmitReport(finding, payload)}
         />
       ))}
     </div>

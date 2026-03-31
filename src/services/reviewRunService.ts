@@ -1,22 +1,22 @@
-import { agentDefinitions } from "@/data/agents";
+import { getReviewAgentDefinitions } from "@/data/agents";
 import { mapApiReviewToResult, mapSnippetSummary, mapSnippetDetail } from "@/features/review-results/mappers";
 import { reviewApi } from "@/services/api/reviewApi";
 import { loadResults, saveResults } from "@/services/local/persistence";
 import { reviewSessionService } from "@/services/reviewSessionService";
-import { AgentRunStatus, ReviewResult, ReviewSession } from "@/types/review";
+import { AgentRunStatus, ReviewMode, ReviewResult, ReviewSession } from "@/types/review";
 
 type StatusListener = (statuses: AgentRunStatus[]) => void;
 
-function createIdleStatuses(): AgentRunStatus[] {
-  return agentDefinitions.map((agent) => ({
+function createIdleStatuses(mode: ReviewMode): AgentRunStatus[] {
+  return getReviewAgentDefinitions(mode).map((agent) => ({
     agentId: agent.id,
     status: "idle",
     progress: 0,
   }));
 }
 
-function createCompletedStatuses(timestamp?: string): AgentRunStatus[] {
-  return agentDefinitions.map((agent) => ({
+function createCompletedStatuses(mode: ReviewMode, timestamp?: string): AgentRunStatus[] {
+  return getReviewAgentDefinitions(mode).map((agent) => ({
     agentId: agent.id,
     status: "completed",
     progress: 100,
@@ -25,13 +25,13 @@ function createCompletedStatuses(timestamp?: string): AgentRunStatus[] {
   }));
 }
 
-function emitQueuedStatuses(listener?: StatusListener) {
+function emitQueuedStatuses(mode: ReviewMode, listener?: StatusListener) {
   if (!listener) {
     return;
   }
 
   listener(
-    agentDefinitions.map((agent) => ({
+    getReviewAgentDefinitions(mode).map((agent) => ({
       agentId: agent.id,
       status: "queued",
       progress: 10,
@@ -39,18 +39,19 @@ function emitQueuedStatuses(listener?: StatusListener) {
   );
 }
 
-function emitRunningStatuses(listener?: StatusListener) {
+function emitRunningStatuses(mode: ReviewMode, listener?: StatusListener) {
   if (!listener) {
     return;
   }
 
+  const agents = getReviewAgentDefinitions(mode);
   listener(
-    agentDefinitions.map((agent, index) => ({
+    agents.map((agent, index) => ({
       agentId: agent.id,
-      status: index < 3 ? "completed" : "running",
-      progress: index < 3 ? 100 : 48,
+      status: mode === "monolithic" ? "running" : index < 3 ? "completed" : "running",
+      progress: mode === "monolithic" ? 64 : index < 3 ? 100 : 48,
       startedAt: new Date().toISOString(),
-      completedAt: index < 3 ? new Date().toISOString() : undefined,
+      completedAt: mode === "monolithic" ? undefined : index < 3 ? new Date().toISOString() : undefined,
     })),
   );
 }
@@ -66,7 +67,16 @@ async function getSnippetDetail(snippetId: string) {
 
 async function getReviewResult(reviewId: string) {
   const results = loadResults();
-  return results[reviewId] ?? null;
+  const result = results[reviewId];
+  if (!result) {
+    return null;
+  }
+
+  return {
+    ...result,
+    issueReports: result.issueReports ?? [],
+    developerComments: result.developerComments ?? [],
+  };
 }
 
 async function runReview(reviewId: string, listener?: StatusListener): Promise<ReviewResult> {
@@ -80,14 +90,14 @@ async function runReview(reviewId: string, listener?: StatusListener): Promise<R
     reviewStartedAt: session.reviewStartedAt ?? new Date().toISOString(),
   });
 
-  emitQueuedStatuses(listener);
+  emitQueuedStatuses(session.reviewMode, listener);
 
-  const experiment = await reviewApi.startExperiment();
+  const experiment = await reviewApi.startExperiment(session.reviewMode);
   const startedAt = session.reviewStartedAt ? new Date(session.reviewStartedAt) : new Date(session.createdAt);
   const submittedAt = new Date();
   const timeSpentSec = Math.max(1, Math.round((submittedAt.getTime() - startedAt.getTime()) / 1000));
 
-  emitRunningStatuses(listener);
+  emitRunningStatuses(session.reviewMode, listener);
 
   const evaluation = await reviewApi.evaluateDeveloperReview({
     session_id: experiment.session_id,
@@ -97,6 +107,8 @@ async function runReview(reviewId: string, listener?: StatusListener): Promise<R
       .filter((comment): comment is ReviewSession["developerComments"][number] & { lineStart: number } => Boolean(comment.lineStart))
       .map((comment) => ({
         line: comment.lineStart,
+        line_start: comment.lineStart,
+        line_end: comment.lineEnd ?? comment.lineStart,
         title: comment.title,
       })),
   });
@@ -135,7 +147,7 @@ async function runReview(reviewId: string, listener?: StatusListener): Promise<R
     timeSpentSec,
   });
 
-  listener?.(createCompletedStatuses(finishedAt));
+  listener?.(createCompletedStatuses(session.reviewMode, finishedAt));
 
   return result;
 }
@@ -143,14 +155,14 @@ async function runReview(reviewId: string, listener?: StatusListener): Promise<R
 async function getAgentStatuses(reviewId: string) {
   const session = await reviewSessionService.getReviewById(reviewId);
   if (!session) {
-    return createIdleStatuses();
+    return createIdleStatuses("specialist");
   }
 
   if (session.status === "completed") {
-    return createCompletedStatuses(session.submittedAt);
+    return createCompletedStatuses(session.reviewMode, session.submittedAt);
   }
 
-  return createIdleStatuses();
+  return createIdleStatuses(session.reviewMode);
 }
 
 export const reviewRunService = {

@@ -1,6 +1,6 @@
 import { CheckCircle2, LoaderCircle } from "lucide-react";
-import { agentDefinitions } from "@/data/agents";
-import { AgentRunStatus } from "@/types/review";
+import { getReviewAgentDefinitions } from "@/data/agents";
+import { AgentRunStatus, ReviewMode } from "@/types/review";
 import { AgentIcon } from "@/components/common/AgentIcon";
 import { cn } from "@/utils/cn";
 
@@ -21,13 +21,16 @@ const statusLabelMap = {
 };
 
 interface AgentStatusPanelProps {
+  mode: ReviewMode;
   statuses: AgentRunStatus[];
 }
 
-export function AgentStatusPanel({ statuses }: AgentStatusPanelProps) {
+export function AgentStatusPanel({ mode, statuses }: AgentStatusPanelProps) {
+  const agents = getReviewAgentDefinitions(mode);
+
   return (
     <div className="space-y-3">
-      {agentDefinitions.map((agent) => {
+      {agents.map((agent) => {
         const status = statuses.find((item) => item.agentId === agent.id);
         const isRunning = status?.status === "running";
         const isCompleted = status?.status === "completed";

@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Panel } from "@/components/common/Panel";
 import { Select } from "@/components/common/Select";
 import { DeveloperComment, FindingSeverity, SnippetDetail } from "@/types/review";
+import { formatLineRange } from "@/utils/format";
 
 interface DeveloperReviewPanelProps {
   snippet?: SnippetDetail;
@@ -25,23 +26,51 @@ function buildFilePath(snippet?: SnippetDetail) {
 }
 
 export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemoveComment }: DeveloperReviewPanelProps) {
-  const [selectedLine, setSelectedLine] = useState<number | undefined>();
+  const [selectionStart, setSelectionStart] = useState<number | undefined>();
+  const [selectionEnd, setSelectionEnd] = useState<number | undefined>();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [severityGuess, setSeverityGuess] = useState<FindingSeverity | "unknown">("unknown");
 
   const lines = useMemo(() => snippet?.code.split("\n") ?? [], [snippet]);
-  const canSubmit = Boolean(snippet && title.trim() && description.trim() && selectedLine);
+  const selectedRange = useMemo(() => {
+    if (!selectionStart) {
+      return null;
+    }
+
+    const end = selectionEnd ?? selectionStart;
+    return {
+      start: Math.min(selectionStart, end),
+      end: Math.max(selectionStart, end),
+    };
+  }, [selectionEnd, selectionStart]);
+  const canSubmit = Boolean(snippet && title.trim() && description.trim() && selectedRange);
   const filePath = buildFilePath(snippet);
+
+  const clearSelection = () => {
+    setSelectionStart(undefined);
+    setSelectionEnd(undefined);
+  };
 
   const resetForm = () => {
     setTitle("");
     setDescription("");
     setSeverityGuess("unknown");
+    clearSelection();
+  };
+
+  const handleSelectLine = (lineNumber: number, extendSelection: boolean) => {
+    if (!selectionStart || !extendSelection) {
+      setSelectionStart(lineNumber);
+      setSelectionEnd(lineNumber);
+      return;
+    }
+
+    setSelectionEnd(lineNumber);
   };
 
   const handleAddComment = () => {
-    if (!canSubmit || !selectedLine) {
+    if (!canSubmit || !selectedRange) {
       return;
     }
 
@@ -49,8 +78,8 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
       title: title.trim(),
       description: description.trim(),
       filePath,
-      lineStart: selectedLine,
-      lineEnd: selectedLine,
+      lineStart: selectedRange.start,
+      lineEnd: selectedRange.end,
       severityGuess,
     });
     resetForm();
@@ -65,8 +94,8 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
           </div>
           <h2 className="font-display text-2xl font-semibold text-on-surface">Comment on lines before AI feedback</h2>
           <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Click a line number in the backend snippet, add your own review note, and submit those comments for AI
-            evaluation. This is the structured fallback for line-level review tied to the real snippet contract.
+            Click a line number to anchor your review comment, or shift-click a second line to capture a multi-line
+            range. Your selected span is what gets scored and compared against the AI coaching output.
           </p>
         </div>
         <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
@@ -80,19 +109,31 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
             <div>
               <div className="text-sm font-medium text-on-surface">{snippet?.id ?? "Loading snippet..."}</div>
               <div className="mt-1 text-xs text-on-surface-variant">
-                Click a line number to anchor your review comment.
+                Click to choose a line. Shift+click a second line to expand into a contiguous range.
               </div>
             </div>
-            {selectedLine ? (
-              <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs text-primary">
-                Selected line {selectedLine}
-              </div>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {selectedRange ? (
+                <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs text-primary">
+                  Selected lines {formatLineRange(selectedRange.start, selectedRange.end)}
+                </div>
+              ) : null}
+              {selectedRange ? (
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+              ) : null}
+            </div>
           </div>
           <div className="max-h-[520px] overflow-auto px-5 py-4 font-mono text-[13px] leading-7 text-on-surface scrollbar-thin">
             {lines.map((line, index) => {
               const lineNumber = index + 1;
-              const isSelected = selectedLine === lineNumber;
+              const isSelected = selectedRange
+                ? lineNumber >= selectedRange.start && lineNumber <= selectedRange.end
+                : false;
+              const isBoundary = selectedRange
+                ? lineNumber === selectedRange.start || lineNumber === selectedRange.end
+                : false;
 
               return (
                 <div
@@ -105,8 +146,8 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
                     type="button"
                     className={`select-none py-0.5 text-right text-xs ${
                       isSelected ? "text-primary" : "text-outline hover:text-on-surface"
-                    }`}
-                    onClick={() => setSelectedLine(lineNumber)}
+                    } ${isBoundary ? "font-semibold" : ""}`}
+                    onClick={(event) => handleSelectLine(lineNumber, event.shiftKey)}
                   >
                     {lineNumber}
                   </button>
@@ -127,7 +168,9 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
             </div>
             <div className="space-y-4">
               <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-on-surface">
-                {selectedLine ? `Anchored to ${filePath}:${selectedLine}` : "Select a line number in the snippet viewer."}
+                {selectedRange
+                  ? `Anchored to ${filePath}:${formatLineRange(selectedRange.start, selectedRange.end)}`
+                  : "Select one or more lines in the snippet viewer."}
               </div>
               <input
                 className="h-11 w-full rounded-xl border border-white/10 bg-surface/90 px-4 text-sm text-on-surface focus:border-primary/60"
@@ -170,7 +213,7 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
               <EmptyState
                 icon={<MessageSquarePlus className="size-6" />}
                 title="No developer comments yet"
-                description="Select a line in the code viewer and add your first structured review finding."
+                description="Select one or more lines in the code viewer and add your first structured review finding."
               />
             ) : (
               <div className="space-y-3">
@@ -181,7 +224,7 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
                         <div className="font-medium text-on-surface">{comment.title}</div>
                         <div className="text-xs text-on-surface-variant">
                           {comment.filePath}
-                          {comment.lineStart ? `:${comment.lineStart}` : ""}
+                          {comment.lineStart ? `:${formatLineRange(comment.lineStart, comment.lineEnd)}` : ""}
                           {comment.severityGuess && comment.severityGuess !== "unknown"
                             ? ` · ${comment.severityGuess}`
                             : ""}

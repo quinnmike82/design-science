@@ -53,8 +53,14 @@ export interface ApiExperimentStartResponse {
   condition: ApiReviewMode;
 }
 
+export interface ApiExperimentStartRequest {
+  preferred_condition?: ApiReviewMode;
+}
+
 export interface ApiFlaggedIssue {
-  line: number;
+  line?: number;
+  line_start?: number;
+  line_end?: number;
   title: string;
 }
 
@@ -72,4 +78,35 @@ export interface ApiEvaluationResponse {
   false_positives: number;
   total_ground_truth: number;
   message: string;
+}
+
+export interface ApiSurveySubmissionRequest {
+  session_id: string;
+  tlx_mental: number;
+  tlx_physical: number;
+  tlx_temporal: number;
+  tlx_performance: number;
+  tlx_effort: number;
+  tlx_frustration: number;
+  trust_score: number;
+  method_helpfulness: number;
+  method_clarity: number;
+  method_actionability: number;
+  platform_usability: number;
+  platform_speed: number;
+  platform_design: number;
+  preferred_mode?: string;
+  feedback_comment?: string;
+}
+
+export interface ApiIssueReportRequest {
+  session_id: string;
+  review_id: string;
+  snippet_id: string;
+  finding_id: string;
+  finding_title: string;
+  agent_id: string;
+  review_mode: ApiReviewMode;
+  reason: string;
+  details?: string;
 }

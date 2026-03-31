@@ -70,6 +70,24 @@ export function WorkspacePage() {
   const reviewId = currentReviewId ?? orderedSessions[0]?.id ?? null;
   const session = reviewId ? sessions[reviewId] : undefined;
   const statuses = reviewId ? agentStatuses[reviewId] ?? [] : [];
+  const modeMeta =
+    session?.reviewMode === "monolithic"
+      ? {
+          title: "Monolithic reviewer",
+          description:
+            "One general-purpose reviewer performs a single end-to-end pass so you can compare the baseline against the specialist workflow.",
+          badge: "Azure baseline",
+          presentation:
+            "The same role-aware dashboard is used for the monolithic baseline, so you can compare the method without changing the UI contract.",
+        }
+      : {
+          title: "Six specialist reviewers",
+          description:
+            "Security, architecture, logic, maintainability, testing, and policy specialists run in parallel before the response is normalized into one results view.",
+          badge: "Azure multi-agent",
+          presentation:
+            "Results are normalized once, then projected into DEV, BA, QA, and PM perspectives without duplicating the underlying data.",
+        };
 
   useEffect(() => {
     if (!currentReviewId && orderedSessions[0]) {
@@ -307,6 +325,24 @@ export function WorkspacePage() {
     }
   };
 
+  const handleStartFreshReview = async () => {
+    const template = session ?? orderedSessions[0];
+    if (!template) {
+      return;
+    }
+
+    setError(null);
+    try {
+      const freshSession = await reviewSessionService.createFreshReviewSession(template);
+      upsertSession(freshSession);
+      setCurrentReviewId(freshSession.id);
+      setCurrentRole(freshSession.stakeholderRole);
+      navigate("/workspace");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to start a fresh review session.");
+    }
+  };
+
   if (!isBootstrapped && !session) {
     return (
       <AppShell withSidebar>
@@ -343,7 +379,7 @@ export function WorkspacePage() {
   return (
     <AppShell withSidebar>
       <div className="mx-auto max-w-[1400px] space-y-8">
-        <ReviewHeader session={session} />
+        <ReviewHeader session={session} onStartFreshReview={() => void handleStartFreshReview()} />
 
         {error ? (
           <Panel className="border border-error/30 bg-error/10 text-error">
@@ -378,6 +414,7 @@ export function WorkspacePage() {
         />
 
         <DeveloperReviewPanel
+          key={`${session.id}-${session.snippetId}`}
           snippet={selectedSnippet}
           comments={session.developerComments}
           onAddComment={(comment) => void handleAddDeveloperComment(comment)}
@@ -430,13 +467,14 @@ export function WorkspacePage() {
                   <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
                     Active agents
                   </div>
-                  <h2 className="mt-1 font-display text-2xl font-semibold text-on-surface">Six specialist reviewers</h2>
+                  <h2 className="mt-1 font-display text-2xl font-semibold text-on-surface">{modeMeta.title}</h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">{modeMeta.description}</p>
                 </div>
                 <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs text-primary">
-                  Azure-backed
+                  {modeMeta.badge}
                 </div>
               </div>
-              <AgentStatusPanel statuses={statuses} />
+              <AgentStatusPanel mode={session.reviewMode} statuses={statuses} />
             </Panel>
 
             <Panel highlighted className="space-y-5">
@@ -444,8 +482,8 @@ export function WorkspacePage() {
                 <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Run control</div>
                 <h2 className="font-display text-2xl font-semibold text-on-surface">Submit your review for coaching</h2>
                 <p className="text-sm leading-7 text-on-surface-variant">
-                  The frontend sends your flagged lines to the analytics evaluator, then runs the selected Azure review
-                  mode and maps the returned findings into role-aware coaching views.
+                  The frontend sends your flagged line selections to the analytics evaluator, then runs the chosen Azure
+                  review mode and maps the returned findings into role-aware coaching views.
                 </p>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
@@ -465,10 +503,7 @@ export function WorkspacePage() {
                     <Layers3 className="size-4 text-secondary" />
                     Presentation mapping
                   </div>
-                  <p className="text-sm leading-6 text-on-surface-variant">
-                    Results are normalized once, then projected into DEV, BA, QA, and PM perspectives without
-                    duplicating the underlying data.
-                  </p>
+                  <p className="text-sm leading-6 text-on-surface-variant">{modeMeta.presentation}</p>
                 </div>
               </div>
               <RunReviewButton

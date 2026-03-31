@@ -1,13 +1,20 @@
+import { RefreshCcw } from "lucide-react";
+import { Button } from "@/components/common/Button";
 import { Badge } from "@/components/common/Badge";
 import { stakeholderRoleConfig } from "@/features/stakeholder-role/roleConfig";
 import { ReviewSession } from "@/types/review";
 
 interface ReviewHeaderProps {
   session: ReviewSession;
+  onStartFreshReview?: () => void;
 }
 
-export function ReviewHeader({ session }: ReviewHeaderProps) {
+export function ReviewHeader({ session, onStartFreshReview }: ReviewHeaderProps) {
   const roleConfig = stakeholderRoleConfig[session.stakeholderRole];
+  const modeCopy =
+    session.reviewMode === "monolithic"
+      ? "Use the baseline monolithic reviewer after you finish your own notes."
+      : "Use the six-agent specialist workflow after you finish your own notes.";
 
   return (
     <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -21,13 +28,19 @@ export function ReviewHeader({ session }: ReviewHeaderProps) {
           </h1>
         </div>
         <p className="max-w-3xl text-sm leading-7 text-on-surface-variant">
-          Load the backend snippet, add your own review comments, and then submit for Azure-backed evaluation and
-          specialist feedback. The same canonical result will later be projected for engineering, QA, BA, and PM
-          perspectives without changing the underlying data.
+          Load the backend snippet, add your own review comments, and then submit for Azure-backed evaluation. {modeCopy}
+          {" "}The same canonical result will later be projected for engineering, QA, BA, and PM perspectives without
+          changing the underlying data.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {onStartFreshReview ? (
+          <Button variant="outline" size="sm" onClick={onStartFreshReview}>
+            <RefreshCcw className="size-4" />
+            Fresh Review
+          </Button>
+        ) : null}
         <Badge className={roleConfig.badgeClass}>{roleConfig.shortLabel}</Badge>
         <Badge className="border-white/10 bg-white/5 text-on-surface-variant">{session.status}</Badge>
       </div>

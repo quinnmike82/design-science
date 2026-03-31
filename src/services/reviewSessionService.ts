@@ -81,6 +81,40 @@ async function createReviewSession(payload: CreateReviewSessionPayload) {
   return session;
 }
 
+async function createFreshReviewSession(source?: ReviewSession) {
+  let template = source;
+
+  if (!template) {
+    const existing = sortSessions(loadSessions());
+    if (existing.length > 0) {
+      template = existing[0];
+    } else {
+      template = (await createBootstrapSession())[0];
+    }
+  }
+
+  if (!template) {
+    throw new Error("A review template could not be created.");
+  }
+
+  return createReviewSession({
+    title: template.title,
+    description: template.description,
+    projectType: template.projectType,
+    language: template.language,
+    stakeholderRole: template.stakeholderRole,
+    snippetId: template.snippetId,
+    snippetTitle: template.snippetTitle,
+    snippetContext: template.snippetContext,
+    snippetLanguage: template.snippetLanguage,
+    snippetCode: template.snippetCode,
+    reviewMode: template.reviewMode,
+    artifacts: [],
+    developerComments: [],
+    reviewStartedAt: new Date().toISOString(),
+  });
+}
+
 async function updateReviewSession(reviewId: string, payload: UpdateReviewSessionPayload) {
   const sessions = loadSessions();
   const current = sessions.find((session) => session.id === reviewId);
@@ -105,5 +139,6 @@ export const reviewSessionService = {
   listReviews,
   getReviewById,
   createReviewSession,
+  createFreshReviewSession,
   updateReviewSession,
 };

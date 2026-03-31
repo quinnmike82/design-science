@@ -60,3 +60,15 @@ export function titleCase(value: string) {
     .replace(/^./, (match) => match.toUpperCase())
     .trim();
 }
+
+export function formatLineRange(lineStart?: number, lineEnd?: number) {
+  if (!lineStart) {
+    return "";
+  }
+
+  if (!lineEnd || lineEnd === lineStart) {
+    return `${lineStart}`;
+  }
+
+  return `${lineStart}-${lineEnd}`;
+}

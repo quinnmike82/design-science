@@ -22,6 +22,8 @@ export type LanguageOption =
 
 export type ReviewMode = "monolithic" | "specialist";
 export type ReviewCondition = "monolithic" | "specialist";
+export type SurveyRating = 1 | 2 | 3 | 4 | 5;
+export type IssueReportReason = "false_positive" | "incorrect_line" | "wrong_severity" | "not_actionable" | "other";
 
 export interface Artifact {
   id: string;
@@ -167,6 +169,32 @@ export interface ReviewCoaching {
   evaluatorMessage?: string;
 }
 
+export interface FindingReport {
+  findingId: string;
+  reason: IssueReportReason;
+  details: string;
+  submittedAt: string;
+}
+
+export interface ReviewSurvey {
+  tlxMental: SurveyRating;
+  tlxPhysical: SurveyRating;
+  tlxTemporal: SurveyRating;
+  tlxPerformance: SurveyRating;
+  tlxEffort: SurveyRating;
+  tlxFrustration: SurveyRating;
+  trustScore: SurveyRating;
+  methodHelpfulness: SurveyRating;
+  methodClarity: SurveyRating;
+  methodActionability: SurveyRating;
+  platformUsability: SurveyRating;
+  platformSpeed: SurveyRating;
+  platformDesign: SurveyRating;
+  preferredMode?: ReviewCondition | "no_preference";
+  feedbackComment?: string;
+  submittedAt: string;
+}
+
 export interface ReviewResult {
   reviewId: string;
   sessionId?: string;
@@ -183,6 +211,8 @@ export interface ReviewResult {
   recommendedActions: string[];
   developerComments: DeveloperComment[];
   coaching: ReviewCoaching;
+  issueReports: FindingReport[];
+  survey?: ReviewSurvey;
 }
 
 export interface CreateReviewSessionPayload {

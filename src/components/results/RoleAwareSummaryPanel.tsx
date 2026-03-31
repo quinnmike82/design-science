@@ -1,5 +1,5 @@
 import { Panel } from "@/components/common/Panel";
-import { agentDefinitions } from "@/data/agents";
+import { getAgentDefinition } from "@/data/agents";
 import { stakeholderRoleConfig } from "@/features/stakeholder-role/roleConfig";
 import { ReviewResult, StakeholderRole } from "@/types/review";
 import { AgentIcon } from "@/components/common/AgentIcon";
@@ -23,16 +23,16 @@ export function RoleAwareSummaryPanel({ result, role }: RoleAwareSummaryPanelPro
       </div>
       <div className="space-y-3">
         {result.agentSummaries.map((summary) => {
-          const agent = agentDefinitions.find((item) => item.id === summary.agentId);
+          const agent = getAgentDefinition(summary.agentId);
           return (
             <div key={summary.agentId} className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-start gap-3">
                 <div className="mt-1 flex size-9 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary">
-                  <AgentIcon name={agent?.icon ?? "shield"} className="size-4" />
+                  <AgentIcon name={agent.icon} className="size-4" />
                 </div>
                 <div className="space-y-2">
                   <div>
-                    <div className="font-medium text-on-surface">{agent?.name ?? summary.agentId}</div>
+                    <div className="font-medium text-on-surface">{agent.name}</div>
                     <div className="text-sm text-on-surface-variant">{summary.headline}</div>
                   </div>
                   <p className="text-sm leading-6 text-on-surface">{summary.summary}</p>

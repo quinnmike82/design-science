@@ -25,7 +25,7 @@ import {
   SnippetDetail,
   SnippetSummary,
 } from "@/types/review";
-import { agentDefinitions } from "@/data/agents";
+import { getAgentDefinition } from "@/data/agents";
 
 const severityMap: Record<ApiSeverity, FindingSeverity> = {
   critical: "critical",
@@ -161,16 +161,34 @@ function buildSuggestedTestCases(agentId: AgentId, finding: ApiReviewFinding, fi
   return Array.from(new Set(cases));
 }
 
+function rangesOverlap(
+  leftStart: number,
+  leftEnd: number,
+  rightStart: number,
+  rightEnd: number,
+  buffer = 2,
+) {
+  return leftStart - buffer <= rightEnd && leftEnd + buffer >= rightStart;
+}
+
 function matchDeveloperComments(
   comments: DeveloperComment[],
   lineStart?: number,
+  lineEnd?: number,
 ): { status: DeveloperFindingStatus; relatedCommentIds: string[] } {
   if (!lineStart || comments.length === 0) {
     return { status: "unknown", relatedCommentIds: [] };
   }
 
   const relatedCommentIds = comments
-    .filter((comment) => comment.lineStart && Math.abs((comment.lineStart ?? 0) - lineStart) <= 2)
+    .filter((comment) => {
+      if (!comment.lineStart) {
+        return false;
+      }
+      const commentStart = comment.lineStart;
+      const commentEnd = comment.lineEnd ?? comment.lineStart;
+      return rangesOverlap(commentStart, commentEnd, lineStart, lineEnd ?? lineStart);
+    })
     .map((comment) => comment.id);
 
   return {
@@ -188,14 +206,14 @@ function mapFinding(
   const agentId = roleMap[finding.role];
   const severity = severityMap[finding.severity];
   const filePath = buildFilePath(snippetId, snippetLanguage);
-  const match = matchDeveloperComments(developerComments, finding.line ?? undefined);
+  const match = matchDeveloperComments(developerComments, finding.line ?? undefined, finding.line ?? undefined);
 
   return {
     id: finding.id ?? `${snippetId}-${finding.role}-${finding.line ?? "na"}-${finding.title}`,
     agentId,
     severity,
     confidence: confidenceMap[finding.confidence],
-    category: agentDefinitions.find((item) => item.id === agentId)?.category ?? "Review Finding",
+    category: getAgentDefinition(agentId).category,
     title: finding.title,
     summary: firstSentence(finding.description),
     technicalDetails: [finding.description, finding.evidence ? `Evidence: ${finding.evidence}` : ""].filter(Boolean).join(" "),
@@ -281,7 +299,7 @@ function buildAgentSummaries(findings: Finding[]): AgentSummary[] {
   return Object.entries(groups).map(([agentId, agentFindings]) => {
     const sorted = [...agentFindings].sort((left, right) => severityRank[right.severity] - severityRank[left.severity]);
     const lead = sorted[0];
-    const agent = agentDefinitions.find((item) => item.id === agentId);
+    const agent = getAgentDefinition(agentId as AgentId);
 
     return {
       agentId: agentId as AgentId,
@@ -374,5 +392,6 @@ export function mapApiReviewToResult(input: {
       summary: buildCoachingSummary(input.evaluation, caught, missed, falsePositives),
       evaluatorMessage: input.evaluation?.message,
     },
+    issueReports: [],
   };
 }

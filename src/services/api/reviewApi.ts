@@ -1,11 +1,14 @@
 import {
   ApiEvaluationResponse,
+  ApiExperimentStartRequest,
   ApiExperimentStartResponse,
+  ApiIssueReportRequest,
   ApiReviewResponse,
   ApiReviewSubmissionRequest,
   ApiSnippetDetail,
   ApiSnippetListResponse,
   ApiReviewMode,
+  ApiSurveySubmissionRequest,
 } from "@/types/api";
 import { apiRequest } from "@/services/api/client";
 
@@ -23,9 +26,13 @@ async function getSnippet(snippetId: string) {
   return apiRequest<ApiSnippetDetail>(`/snippets/${snippetId}`);
 }
 
-async function startExperiment() {
+async function startExperiment(preferredCondition?: ApiReviewMode) {
+  const payload: ApiExperimentStartRequest | undefined = preferredCondition
+    ? { preferred_condition: preferredCondition }
+    : undefined;
   return apiRequest<ApiExperimentStartResponse>("/api/analytics/start", {
     method: "POST",
+    body: payload ? JSON.stringify(payload) : undefined,
   });
 }
 
@@ -47,10 +54,26 @@ async function reviewSnippet({ snippetId, context, mode }: ReviewSnippetInput) {
   });
 }
 
+async function submitSurvey(payload: ApiSurveySubmissionRequest) {
+  return apiRequest<{ status: string; message: string }>("/api/analytics/survey", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+async function reportIssue(payload: ApiIssueReportRequest) {
+  return apiRequest<{ status: string; report_id: string }>("/api/feedback/issues", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export const reviewApi = {
   listSnippets,
   getSnippet,
   startExperiment,
   evaluateDeveloperReview,
   reviewSnippet,
+  submitSurvey,
+  reportIssue,
 };

@@ -16,14 +16,16 @@ import { RoleAwareSummaryPanel } from "@/components/results/RoleAwareSummaryPane
 import { AgentFilterBar } from "@/components/results/AgentFilterBar";
 import { FindingsList } from "@/components/results/FindingsList";
 import { FollowUpChatPanel } from "@/components/results/FollowUpChatPanel";
+import { ReviewSurveyPanel } from "@/components/results/ReviewSurveyPanel";
 import { StakeholderRoleSelect } from "@/components/review/StakeholderRoleSelect";
-import { agentDefinitions } from "@/data/agents";
+import { getAgentDefinition } from "@/data/agents";
 import { filterAndSortFindings } from "@/features/review-results/filters";
 import { getRoleBasedExecutiveSummary } from "@/features/review-results/presenters";
+import { reviewFeedbackService } from "@/services/reviewFeedbackService";
 import { reviewRunService } from "@/services/reviewRunService";
 import { reviewSessionService } from "@/services/reviewSessionService";
 import { useReviewStore } from "@/store/useReviewStore";
-import { ReviewSession, StakeholderRole } from "@/types/review";
+import { Finding, ReviewSession, ReviewSurvey, StakeholderRole } from "@/types/review";
 
 export function ResultsPage() {
   const params = useParams<{ reviewId: string }>();
@@ -55,9 +57,15 @@ export function ResultsPage() {
   })));
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [reportingFindingId, setReportingFindingId] = useState<string | null>(null);
+  const [isSurveySubmitting, setIsSurveySubmitting] = useState(false);
 
   const session = sessions[reviewId];
   const result = results[reviewId];
+  const feedbackSessionId = result?.sessionId ?? session?.backendSessionId;
+  const reports = result?.issueReports ?? [];
+  const survey = result?.survey;
 
   useEffect(() => {
     if (reviewId && currentReviewId !== reviewId) {
@@ -65,6 +73,7 @@ export function ResultsPage() {
     }
     resetResultsFilters();
     setExpandedIds([]);
+    setFeedbackError(null);
   }, [currentReviewId, resetResultsFilters, reviewId, setCurrentReviewId]);
 
   useEffect(() => {
@@ -143,9 +152,56 @@ export function ResultsPage() {
     const ids = Array.from(new Set((result?.findings ?? []).map((finding) => finding.agentId)));
     return ids.map((id) => ({
       id,
-      name: agentDefinitions.find((agent) => agent.id === id)?.name ?? `${id} agent`,
+      name: getAgentDefinition(id).name,
     }));
   }, [result]);
+
+  const handleReportFinding = async (
+    finding: Finding,
+    payload: { reason: "false_positive" | "incorrect_line" | "wrong_severity" | "not_actionable" | "other"; details: string },
+  ) => {
+    if (!feedbackSessionId || !session || !result) {
+      return;
+    }
+
+    setFeedbackError(null);
+    setReportingFindingId(finding.id);
+    try {
+      const updated = await reviewFeedbackService.reportFinding({
+        reviewId,
+        sessionId: feedbackSessionId,
+        snippetId: session.snippetId,
+        findingId: finding.id,
+        findingTitle: finding.title,
+        agentId: finding.agentId,
+        reviewMode: result.mode,
+        reason: payload.reason,
+        details: payload.details,
+      });
+      setResult(updated);
+    } catch (nextError) {
+      setFeedbackError(nextError instanceof Error ? nextError.message : "Failed to save the issue report.");
+    } finally {
+      setReportingFindingId(null);
+    }
+  };
+
+  const handleSubmitSurvey = async (nextSurvey: Omit<ReviewSurvey, "submittedAt">) => {
+    if (!feedbackSessionId) {
+      return;
+    }
+
+    setFeedbackError(null);
+    setIsSurveySubmitting(true);
+    try {
+      const updated = await reviewFeedbackService.submitSurvey(reviewId, feedbackSessionId, nextSurvey);
+      setResult(updated);
+    } catch (nextError) {
+      setFeedbackError(nextError instanceof Error ? nextError.message : "Failed to save the survey.");
+    } finally {
+      setIsSurveySubmitting(false);
+    }
+  };
 
   if (!reviewId) {
     return (
@@ -162,6 +218,31 @@ export function ResultsPage() {
   }
 
   if (!session || !result) {
+    if (session && !result && session.status !== "running") {
+      return (
+        <AppShell withSidebar>
+          <div className="mx-auto max-w-[1400px] space-y-6">
+            {error ? (
+              <Panel className="border border-error/30 bg-error/10 text-error">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+                  <div>
+                    <div className="font-medium">Results issue</div>
+                    <div className="mt-1 text-sm leading-6 text-red-100">{error}</div>
+                  </div>
+                </div>
+              </Panel>
+            ) : null}
+            <EmptyState
+              icon={<AlertTriangle className="size-6" />}
+              title="No results available yet"
+              description="Run the review from the workspace first, then this page will show the coaching dashboard, issue reporting, and post-review survey."
+            />
+          </div>
+        </AppShell>
+      );
+    }
+
     return (
       <AppShell withSidebar>
         <div className="mx-auto max-w-[1400px] space-y-6">
@@ -194,6 +275,18 @@ export function ResultsPage() {
               <div>
                 <div className="font-medium">Results issue</div>
                 <div className="mt-1 text-sm leading-6 text-red-100">{error}</div>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
+        {feedbackError ? (
+          <Panel className="border border-error/30 bg-error/10 text-error">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+              <div>
+                <div className="font-medium">Feedback issue</div>
+                <div className="mt-1 text-sm leading-6 text-red-100">{feedbackError}</div>
               </div>
             </div>
           </Panel>
@@ -280,6 +373,10 @@ export function ResultsPage() {
             findings={filteredFindings}
             role={currentRole}
             developerComments={result.developerComments}
+            reports={reports}
+            canReport={Boolean(feedbackSessionId)}
+            reportingFindingId={reportingFindingId}
+            reportDisabledReason="Run a completed review first so issue reports can be tied to a backend analytics session."
             expandedIds={expandedIds}
             onToggle={(findingId) =>
               setExpandedIds((current) =>
@@ -288,8 +385,18 @@ export function ResultsPage() {
             }
             onExpandAll={() => setExpandedIds(filteredFindings.map((finding) => finding.id))}
             onCollapseAll={() => setExpandedIds([])}
+            onSubmitReport={handleReportFinding}
           />
         </section>
+
+        <ReviewSurveyPanel
+          mode={result.mode}
+          survey={survey}
+          canSubmit={Boolean(feedbackSessionId)}
+          disabledReason="Run a completed review first so survey responses can be attached to an experiment session."
+          submitting={isSurveySubmitting}
+          onSubmit={handleSubmitSurvey}
+        />
       </div>
     </AppShell>
   );

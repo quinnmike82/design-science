@@ -1,4 +1,4 @@
-import { AgentDefinition } from "@/types/review";
+import { AgentDefinition, AgentId, ReviewMode } from "@/types/review";
 
 export const agentDefinitions: AgentDefinition[] = [
   {
@@ -50,3 +50,24 @@ export const agentDefinitions: AgentDefinition[] = [
     colorToken: "secondary",
   },
 ];
+
+export const monolithicAgentDefinition: AgentDefinition = {
+  id: "general",
+  name: "Monolithic Reviewer",
+  category: "Single-pass baseline",
+  description: "Runs one general-purpose review instead of splitting work across six specialist agents.",
+  icon: "sparkles",
+  colorToken: "primary",
+};
+
+const agentDefinitionMap = new Map<AgentId, AgentDefinition>(
+  [...agentDefinitions, monolithicAgentDefinition].map((agent) => [agent.id, agent]),
+);
+
+export function getAgentDefinition(agentId: AgentId): AgentDefinition {
+  return agentDefinitionMap.get(agentId) ?? monolithicAgentDefinition;
+}
+
+export function getReviewAgentDefinitions(mode: ReviewMode): AgentDefinition[] {
+  return mode === "monolithic" ? [monolithicAgentDefinition] : agentDefinitions;
+}

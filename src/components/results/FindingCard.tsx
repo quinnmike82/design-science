@@ -1,11 +1,14 @@
-import { Badge } from "@/components/common/Badge";
-import { Panel } from "@/components/common/Panel";
-import { agentDefinitions } from "@/data/agents";
-import { getRoleBasedFindingView } from "@/features/review-results/presenters";
-import { DeveloperComment, Finding, StakeholderRole } from "@/types/review";
-import { AgentIcon } from "@/components/common/AgentIcon";
-import { Button } from "@/components/common/Button";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { AgentIcon } from "@/components/common/AgentIcon";
+import { Badge } from "@/components/common/Badge";
+import { Button } from "@/components/common/Button";
+import { Panel } from "@/components/common/Panel";
+import { Select } from "@/components/common/Select";
+import { getAgentDefinition } from "@/data/agents";
+import { getRoleBasedFindingView } from "@/features/review-results/presenters";
+import { formatLineRange } from "@/utils/format";
+import { DeveloperComment, Finding, FindingReport, IssueReportReason, StakeholderRole } from "@/types/review";
 
 const severityClassMap = {
   critical: "border-error/35 bg-error/10 text-error",
@@ -14,25 +17,81 @@ const severityClassMap = {
   low: "border-white/10 bg-white/5 text-on-surface-variant",
 };
 
-interface FindingCardProps {
-  finding: Finding;
-  role: StakeholderRole;
-  expanded: boolean;
-  relatedComments: DeveloperComment[];
-  onToggle: (findingId: string) => void;
-}
-
 const developerStatusCopy = {
   found: "Already found by developer",
   missed: "Missed by developer",
   unknown: "No direct line match",
 } as const;
 
-export function FindingCard({ finding, role, expanded, relatedComments, onToggle }: FindingCardProps) {
+const issueReportReasonOptions: Array<{ value: IssueReportReason; label: string }> = [
+  { value: "false_positive", label: "This is not actually an issue" },
+  { value: "incorrect_line", label: "The line reference is wrong" },
+  { value: "wrong_severity", label: "The severity is off" },
+  { value: "not_actionable", label: "The guidance is not actionable" },
+  { value: "other", label: "Other feedback" },
+];
+
+interface FindingCardProps {
+  finding: Finding;
+  role: StakeholderRole;
+  expanded: boolean;
+  relatedComments: DeveloperComment[];
+  report?: FindingReport;
+  canReport: boolean;
+  isReporting: boolean;
+  reportDisabledReason?: string;
+  onToggle: (findingId: string) => void;
+  onSubmitReport: (payload: { reason: IssueReportReason; details: string }) => Promise<void>;
+}
+
+function formatSubmittedAt(timestamp: string) {
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? "saved" : parsed.toLocaleString();
+}
+
+export function FindingCard({
+  finding,
+  role,
+  expanded,
+  relatedComments,
+  report,
+  canReport,
+  isReporting,
+  reportDisabledReason,
+  onToggle,
+  onSubmitReport,
+}: FindingCardProps) {
   const view = getRoleBasedFindingView(finding, role);
-  const agent = agentDefinitions.find((item) => item.id === finding.agentId);
+  const agent = getAgentDefinition(finding.agentId);
   const buttonId = `finding-trigger-${finding.id}`;
   const panelId = `finding-panel-${finding.id}`;
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<IssueReportReason>(report?.reason ?? "false_positive");
+  const [reportDetails, setReportDetails] = useState(report?.details ?? "");
+
+  useEffect(() => {
+    setReportReason(report?.reason ?? "false_positive");
+    setReportDetails(report?.details ?? "");
+  }, [report?.details, report?.reason]);
+
+  const handleToggleReport = () => {
+    if (!expanded) {
+      onToggle(finding.id);
+    }
+    setIsReportOpen((current) => !current);
+  };
+
+  const handleSubmitReport = async () => {
+    try {
+      await onSubmitReport({
+        reason: reportReason,
+        details: reportDetails.trim(),
+      });
+      setIsReportOpen(false);
+    } catch {
+      // The parent renders the error state; keep the form open for correction.
+    }
+  };
 
   return (
     <Panel className="group transition-all hover:border-primary/20 hover:bg-surface-high">
@@ -57,17 +116,18 @@ export function FindingCard({ finding, role, expanded, relatedComments, onToggle
             {finding.filePath ? (
               <span className="font-mono text-xs text-on-surface-variant">
                 {finding.filePath}
-                {finding.lineStart ? `:${finding.lineStart}` : ""}
+                {finding.lineStart ? `:${formatLineRange(finding.lineStart, finding.lineEnd)}` : ""}
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-2">
-            {agent ? (
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
-                <AgentIcon name={agent.icon} className="size-4" />
-                {agent.name}
-              </div>
-            ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
+              <AgentIcon name={agent.icon} className="size-4" />
+              {agent.name}
+            </div>
+            <Button variant="outline" size="sm" disabled={!canReport} onClick={handleToggleReport}>
+              {report ? "Update report" : "Report issue"}
+            </Button>
             <Button
               id={buttonId}
               variant="ghost"
@@ -114,12 +174,69 @@ export function FindingCard({ finding, role, expanded, relatedComments, onToggle
               </div>
             ))}
 
-            <div className="rounded-2xl border border-white/10 bg-primary/5 p-4">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
                 {view.recommendationLabel}
               </div>
               <p className="mt-2 text-sm leading-6 text-on-surface">{view.recommendation}</p>
             </div>
+
+            {isReportOpen ? (
+              <div className="rounded-2xl border border-tertiary/20 bg-tertiary/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-tertiary">
+                      Report this AI finding
+                    </div>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                      Tell us what was wrong with this finding so we can compare model quality and platform usability.
+                    </p>
+                  </div>
+                  {report ? (
+                    <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
+                      Saved {formatSubmittedAt(report.submittedAt)}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+                  <Select
+                    label="What is wrong?"
+                    value={reportReason}
+                    onChange={(event) => setReportReason(event.target.value as IssueReportReason)}
+                  >
+                    {issueReportReasonOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+                      Notes
+                    </span>
+                    <textarea
+                      className="min-h-[116px] w-full rounded-2xl border border-white/10 bg-surface/90 px-4 py-3 text-sm leading-6 text-on-surface focus:border-primary/60"
+                      value={reportDetails}
+                      onChange={(event) => setReportDetails(event.target.value)}
+                      placeholder="Optional detail about why this finding was incorrect or unhelpful."
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs text-on-surface-variant">
+                    {canReport ? "You can resubmit this feedback if you want to update it." : reportDisabledReason}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setIsReportOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" disabled={!canReport || isReporting} onClick={() => void handleSubmitReport()}>
+                      {isReporting ? "Saving..." : report ? "Update report" : "Submit report"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {relatedComments.length > 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -132,7 +249,7 @@ export function FindingCard({ finding, role, expanded, relatedComments, onToggle
                       <div className="font-medium text-on-surface">{comment.title}</div>
                       <div className="mt-1 text-xs text-on-surface-variant">
                         {comment.filePath}
-                        {comment.lineStart ? `:${comment.lineStart}` : ""}
+                        {comment.lineStart ? `:${formatLineRange(comment.lineStart, comment.lineEnd)}` : ""}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-on-surface-variant">{comment.description}</p>
                     </div>

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { BarChart3, Code2, History, Plus, Sparkles } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
+import { reviewSessionService } from "@/services/reviewSessionService";
 import { useReviewStore } from "@/store/useReviewStore";
 import { cn } from "@/utils/cn";
 
@@ -23,8 +25,34 @@ const items = [
 ];
 
 export function SideNav() {
-  const currentReviewId = useReviewStore((state) => state.currentReviewId);
+  const navigate = useNavigate();
+  const { currentReviewId, sessions, upsertSession, setCurrentReviewId } = useReviewStore((state) => ({
+    currentReviewId: state.currentReviewId,
+    sessions: state.sessions,
+    upsertSession: state.upsertSession,
+    setCurrentReviewId: state.setCurrentReviewId,
+  }));
+  const [isCreatingReview, setIsCreatingReview] = useState(false);
   const resultLink = currentReviewId ? `/results/${currentReviewId}` : "/results/rev-synth-001";
+  const currentSession = currentReviewId ? sessions[currentReviewId] : undefined;
+  const kernelCopy =
+    currentSession?.reviewMode === "monolithic"
+      ? "Monolithic mode keeps the same workflow but hides the specialist roster and runs one baseline reviewer."
+      : "Specialist mode runs six focused reviewers and merges the output into one stakeholder-ready result.";
+
+  const handleCreateFreshReview = async () => {
+    setIsCreatingReview(true);
+    try {
+      const freshSession = await reviewSessionService.createFreshReviewSession(currentSession);
+      upsertSession(freshSession);
+      setCurrentReviewId(freshSession.id);
+      navigate("/workspace");
+    } catch (error) {
+      console.error("Failed to create a fresh review session.", error);
+    } finally {
+      setIsCreatingReview(false);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-16 hidden h-[calc(100vh-4rem)] w-[272px] border-r border-white/10 bg-surface-low/95 px-6 py-6 backdrop-blur-xl lg:flex lg:flex-col">
@@ -38,11 +66,9 @@ export function SideNav() {
         </div>
       </div>
 
-      <Button asChild className="mb-6 w-full justify-center" size="md">
-        <Link to="/workspace">
-          <Plus className="size-4" />
-          New Review
-        </Link>
+      <Button className="mb-6 w-full justify-center" size="md" onClick={() => void handleCreateFreshReview()} disabled={isCreatingReview}>
+        <Plus className="size-4" />
+        {isCreatingReview ? "Creating..." : "New Review"}
       </Button>
 
       <nav className="space-y-2">
@@ -69,9 +95,7 @@ export function SideNav() {
 
       <div className="mt-auto rounded-3xl border border-white/10 bg-white/5 p-4">
         <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Review Kernel</div>
-        <p className="mt-2 text-sm leading-6 text-on-surface">
-          Six specialist agents normalize the same review result into stakeholder-ready perspectives.
-        </p>
+        <p className="mt-2 text-sm leading-6 text-on-surface">{kernelCopy}</p>
       </div>
     </aside>
   );
