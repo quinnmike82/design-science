@@ -511,7 +511,7 @@ function createMockIssues(request: ReviewSubmitRequest) {
     originalSnippet: fallbackSnippet,
     replacementSnippet: undefined,
     sourceFileContent: fallbackFile?.content,
-    rationale: "Fallback issue generated locally so the user can continue through summary and marker review steps.",
+    rationale: "Fallback issue generated locally so the user can continue through the summary and marker review phases.",
     canRenderRichDiff: false,
     noteMatchStatus: "unknown",
     relatedNoteIds: [],

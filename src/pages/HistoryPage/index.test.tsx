@@ -78,8 +78,8 @@ describe("HistoryPage", () => {
     );
 
     expect(await screen.findByText("2m 15s")).toBeInTheDocument();
-    expect(screen.getByText("Step 1 1m 0s")).toBeInTheDocument();
-    expect(screen.getByText("Step 2 45s")).toBeInTheDocument();
-    expect(screen.getByText("Step 3 30s")).toBeInTheDocument();
+    expect(screen.getByText("Phase 1 1m 0s")).toBeInTheDocument();
+    expect(screen.getByText("Phase 2 45s")).toBeInTheDocument();
+    expect(screen.getByText("Phase 3 30s")).toBeInTheDocument();
   });
 });

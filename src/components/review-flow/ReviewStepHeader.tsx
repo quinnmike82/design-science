@@ -3,9 +3,9 @@ import { formatDuration } from "@/utils/format";
 import { cn } from "@/utils/cn";
 
 const steps: Array<{ id: ReviewFlowStep; label: string; title: string }> = [
-  { id: 1, label: "Step 1", title: "Input" },
-  { id: 2, label: "Step 2", title: "Summary" },
-  { id: 3, label: "Step 3", title: "Marker Review" },
+  { id: 1, label: "Phase 1", title: "Input" },
+  { id: 2, label: "Phase 2", title: "Summary" },
+  { id: 3, label: "Phase 3", title: "Marker Review" },
 ];
 
 interface ReviewStepHeaderProps {

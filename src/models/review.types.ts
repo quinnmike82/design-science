@@ -9,6 +9,8 @@ export type ReviewTransportMode = "api" | "mock-fallback";
 export type ReviewFileKind = "main" | "supporting";
 export type SupportingDocumentType = "fsd" | "testcase" | "notes" | "other";
 export type ReviewIssueSeverity = "critical" | "high" | "medium" | "low";
+export type ReviewerRoleOption = "DEV" | "BA" | "QA" | "PM";
+export type ReviewerToolOption = "github" | "gitlab" | "azure_devops" | "ide" | "ai_assistant" | "other";
 export type ReviewLineNote = DeveloperComment;
 export type ReviewSourceSnippetSummary = SnippetSummary;
 export type ReviewSourceSnippetDetail = SnippetDetail;
@@ -122,6 +124,25 @@ export interface ReviewResultViewModel {
   rawResponse: unknown;
 }
 
+export interface ReviewReviewerProfile {
+  role: ReviewerRoleOption;
+  yearsOfExperience?: number;
+  usualReviewTool: ReviewerToolOption;
+  codeReviewImportance: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReviewSubmissionMetadata {
+  apiReviewId?: string;
+  transportMode?: ReviewTransportMode;
+  capturedAt?: string;
+}
+
+export interface ReviewPhaseFinding extends ReviewLineNote {
+  sourcePhase: Extract<ReviewFlowStep, 3>;
+}
+
 export interface ReviewStepMetrics {
   totalActiveSec: number;
   stepTimesSec: Record<ReviewFlowStep, number>;
@@ -136,6 +157,9 @@ export interface ReviewRunRecord {
   updatedAt: string;
   currentStep: ReviewFlowStep;
   stepMetrics: ReviewStepMetrics;
+  reviewerProfile?: ReviewReviewerProfile;
+  submissionMetadata?: ReviewSubmissionMetadata;
+  phase3Findings: ReviewPhaseFinding[];
   input: ReviewInputState;
   result?: ReviewResultViewModel;
   survey?: ReviewSurvey;

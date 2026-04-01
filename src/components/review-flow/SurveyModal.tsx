@@ -130,7 +130,7 @@ export function SurveyModal({
       },
       {
         key: "codeReviewClarityScore",
-        title: "How clear was the file-level code review in Step 3?",
+        title: "How clear was the file-level code review in Phase 3?",
         helper: "1 = unclear, 2 = manageable, 3 = very clear",
       },
       {

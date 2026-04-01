@@ -242,7 +242,7 @@ export function LandingPage() {
         <Panel highlighted className="space-y-6 px-6 py-10 md:px-10 md:py-14">
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Start The Demo</div>
           <h2 className="font-display text-4xl font-bold tracking-tight text-on-surface md:text-5xl">
-            Launch the review workspace and run the 3-step review flow.
+            Launch the review workspace and run the 3-phase review flow.
           </h2>
           <p className="mx-auto max-w-2xl text-sm leading-7 text-on-surface-variant">
             Upload review input, inspect the structured summary, then move into the marker review experience with inline feedback and a lightweight survey.

@@ -34,8 +34,8 @@ export function SideNav() {
   );
 
   const kernelCopy = latestRunId
-    ? "The latest review run stays available in the shared 3-step flow, so summary and marker review stay connected."
-    : "Create a review run to populate the shared 3-step input, summary, and marker review workflow.";
+    ? "The latest review run stays available in the shared 3-phase flow, so summary and marker review stay connected."
+    : "Create a review run to populate the shared 3-phase input, summary, and marker review workflow.";
 
   const handleCreateFreshReview = async () => {
     setIsCreatingReview(true);
@@ -55,7 +55,7 @@ export function SideNav() {
         </div>
         <div>
           <div className="font-display text-lg font-semibold text-on-surface">Agentic Review</div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/70">3-Step Flow</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-primary/70">3-Phase Flow</div>
         </div>
       </div>
 

@@ -1,9 +1,16 @@
 import { Panel } from "@/components/common/Panel";
 import { CodeMarkerReviewList } from "@/components/review-flow/CodeMarkerReviewList";
-import type { ReviewIssueViewModel, ReviewResultViewModel } from "@/models/review.types";
+import type {
+  ReviewInputFile,
+  ReviewIssueViewModel,
+  ReviewPhaseFinding,
+  ReviewResultViewModel,
+} from "@/models/review.types";
 
 interface Step3MarkerReviewSectionProps {
   result?: ReviewResultViewModel;
+  submittedFiles?: ReviewInputFile[];
+  phase3Findings: ReviewPhaseFinding[];
   commentingIds: string[];
   wrongResultIds: string[];
   suggestedLineFaultIds: string[];
@@ -17,10 +24,14 @@ interface Step3MarkerReviewSectionProps {
     lineText: string,
     suggestedLineNumber?: number,
   ) => void;
+  onAddPhase3Finding: (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => void;
+  onRemovePhase3Finding: (findingId: string) => void;
 }
 
 export function Step3MarkerReviewSection({
   result,
+  submittedFiles,
+  phase3Findings,
   commentingIds,
   wrongResultIds,
   suggestedLineFaultIds,
@@ -29,19 +40,23 @@ export function Step3MarkerReviewSection({
   onOpenComment,
   onOpenWrongResult,
   onOpenSuggestedLineFault,
+  onAddPhase3Finding,
+  onRemovePhase3Finding,
 }: Step3MarkerReviewSectionProps) {
   return (
     <div className="space-y-6">
       <Panel className="space-y-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Code marker / replacement review</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 3 · Step 1</div>
         <h2 className="font-display text-3xl font-semibold text-on-surface">GitHub-like review detail</h2>
         <p className="max-w-4xl text-sm leading-7 text-on-surface-variant">
-          Step 3 now combines all flagged line changes back into the original file view, so reviewers can scan the code once, inspect the red and green rows, and only report faulty suggestions where needed.
+          Phase 3 combines all flagged line changes back into the original file view, so reviewers can scan the code once, inspect the red and green rows, report faulty suggestions, and store extra bugs the agent missed.
         </p>
       </Panel>
 
       <CodeMarkerReviewList
         issues={result?.issues ?? []}
+        submittedFiles={submittedFiles ?? []}
+        phase3Findings={phase3Findings}
         commentingIds={commentingIds}
         wrongResultIds={wrongResultIds}
         suggestedLineFaultIds={suggestedLineFaultIds}
@@ -50,6 +65,8 @@ export function Step3MarkerReviewSection({
         onComment={onOpenComment}
         onMarkWrong={onOpenWrongResult}
         onReportSuggestedLineFault={onOpenSuggestedLineFault}
+        onAddPhase3Finding={onAddPhase3Finding}
+        onRemovePhase3Finding={onRemovePhase3Finding}
       />
     </div>
   );

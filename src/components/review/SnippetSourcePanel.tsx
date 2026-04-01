@@ -26,7 +26,7 @@ export function SnippetSourcePanel({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-            Azure source snippet
+            Phase 1 · Step 2
           </div>
           <h2 className="font-display text-2xl font-semibold text-on-surface">Server-backed review target</h2>
           <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">

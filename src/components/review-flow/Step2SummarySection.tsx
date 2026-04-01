@@ -29,7 +29,7 @@ export function Step2SummarySection({ result, reportingIds, onReportFault, onCon
       </div>
 
       <Panel className="space-y-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Review result summary</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 2 · Step 1</div>
         <h2 className="font-display text-3xl font-semibold text-on-surface">Findings overview</h2>
         <p className="max-w-4xl text-sm leading-7 text-on-surface-variant">
           {result?.summaryText ?? "No review summary is available yet."}
@@ -37,9 +37,8 @@ export function Step2SummarySection({ result, reportingIds, onReportFault, onCon
       </Panel>
 
       <Panel className="space-y-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">
-          Interviewer Note Comparison
-        </div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 2 · Step 2</div>
+        <div className="font-medium text-on-surface">Interviewer Note Comparison</div>
         <div className="grid gap-4 lg:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
             <div className="text-xs text-on-surface-variant">Total notes</div>

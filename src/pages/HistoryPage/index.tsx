@@ -19,7 +19,7 @@ export function HistoryPage() {
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Review history</div>
           <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Previous review runs</h1>
           <p className="max-w-3xl text-sm leading-7 text-on-surface-variant">
-            Open a saved review run in the shared 3-step flow. History is currently persisted on the frontend so the experience stays usable while backend run indexing is still in progress.
+            Open a saved review run in the shared 3-phase flow. History is currently persisted on the frontend so the experience stays usable while backend run indexing is still in progress.
           </p>
         </div>
 
@@ -65,9 +65,9 @@ export function HistoryPage() {
                       <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">Time spent</div>
                       <div className="mt-2 text-sm text-on-surface">{formatDuration(timingSnapshot.totalActiveSec)}</div>
                       <div className="mt-2 space-y-1 text-xs text-on-surface-variant">
-                        <div>Step 1 {formatDuration(timingSnapshot.stepTimesSec[1])}</div>
-                        <div>Step 2 {formatDuration(timingSnapshot.stepTimesSec[2])}</div>
-                        <div>Step 3 {formatDuration(timingSnapshot.stepTimesSec[3])}</div>
+                        <div>Phase 1 {formatDuration(timingSnapshot.stepTimesSec[1])}</div>
+                        <div>Phase 2 {formatDuration(timingSnapshot.stepTimesSec[2])}</div>
+                        <div>Phase 3 {formatDuration(timingSnapshot.stepTimesSec[3])}</div>
                       </div>
                     </div>
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReviewFlowPage } from "@/pages/ReviewFlowPage";
 
 const snippetId = "snippet_algebra";
+const reviewRunsStorageKey = "synthetic-architect.review-flow.runs";
 const snippetCode = [
   "import numpy as np",
   "arr = np.array([[4, 2], [1, 3]])",
@@ -31,6 +32,25 @@ function renderPage() {
     </MemoryRouter>,
   );
   return { user };
+}
+
+function readStoredRuns() {
+  return JSON.parse(window.localStorage.getItem(reviewRunsStorageKey) ?? "[]") as Array<Record<string, unknown>>;
+}
+
+async function closeReviewerProfileModalIfOpen(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = screen.queryByRole("dialog");
+  if (!dialog) {
+    return;
+  }
+
+  const closeButton = within(dialog).queryByRole("button", { name: /Done|Continue in Background/i });
+  if (!closeButton) {
+    return;
+  }
+
+  await user.click(closeButton);
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 }
 
 async function prepareReview(user: ReturnType<typeof userEvent.setup>) {
@@ -60,6 +80,7 @@ async function submitReview(user: ReturnType<typeof userEvent.setup>) {
   const { runButton } = await prepareReview(user);
   await user.click(runButton);
   await screen.findByRole("heading", { name: "Findings overview" });
+  await closeReviewerProfileModalIfOpen(user);
 }
 
 beforeEach(() => {
@@ -99,7 +120,7 @@ beforeEach(() => {
 describe("ReviewFlowPage", () => {
   it("does not crash when an older persisted review run is missing new input fields", async () => {
     window.localStorage.setItem(
-      "synthetic-architect.review-flow.runs",
+      reviewRunsStorageKey,
       JSON.stringify([
         {
           id: "legacy-run-1",
@@ -123,7 +144,7 @@ describe("ReviewFlowPage", () => {
 
   it("does not crash in step 3 when an older persisted run is missing suggested line feedback fields", async () => {
     window.localStorage.setItem(
-      "synthetic-architect.review-flow.runs",
+      reviewRunsStorageKey,
       JSON.stringify([
         {
           id: "legacy-step3-run",
@@ -267,7 +288,7 @@ describe("ReviewFlowPage", () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
 
     expect(screen.getByRole("heading", { name: "GitHub-like review detail" })).toBeInTheDocument();
   });
@@ -276,25 +297,27 @@ describe("ReviewFlowPage", () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
+
+    const combinedReview = screen.getByRole("region", { name: /Combined file review for /i });
 
     expect(screen.getByText(/All highlighted changes for this file are merged into one review box/i)).toBeInTheDocument();
     expect(screen.getByText(/Combined File Review/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Expand Unchanged Lines/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Show 3 unchanged lines \(1-3\)/i })).toBeInTheDocument();
-    expect(screen.queryByText("import numpy as np")).not.toBeInTheDocument();
-    expect(screen.getByText(/result = eval\('2 \+ 2'\)/)).toBeInTheDocument();
+    expect(within(combinedReview).getByRole("button", { name: /Show 3 unchanged lines \(1-3\)/i })).toBeInTheDocument();
+    expect(within(combinedReview).queryByText("import numpy as np")).not.toBeInTheDocument();
+    expect(within(combinedReview).getByText(/result = eval\('2 \+ 2'\)/)).toBeInTheDocument();
     expect(
       screen.getByText(/Replace eval with a deterministic parser or allow-listed dispatch/),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Expand Unchanged Lines/i }));
-    expect(screen.getByText("import numpy as np")).toBeInTheDocument();
+    expect(within(combinedReview).getByText("import numpy as np")).toBeInTheDocument();
   });
 
   it("generates a frontend replacement line when backend does not return replacement code", async () => {
     window.localStorage.setItem(
-      "synthetic-architect.review-flow.runs",
+      reviewRunsStorageKey,
       JSON.stringify([
         {
           id: "frontend-generated-run",
@@ -373,16 +396,14 @@ describe("ReviewFlowPage", () => {
     renderPage();
 
     expect(await screen.findByText(/payload: SpecificType = source;/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Some green rows were generated directly by the frontend from the agent suggestion/i),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Some green rows were generated directly by the frontend/i)).not.toBeInTheDocument();
   });
 
   it("opens the comment modal and saves a comment for an issue", async () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
     await user.click(screen.getByRole("button", { name: "Comment" }));
 
     const dialog = screen.getByRole("dialog");
@@ -396,7 +417,7 @@ describe("ReviewFlowPage", () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
     await user.click(screen.getByRole("button", { name: "Mark Wrong Result" }));
 
     const dialog = screen.getByRole("dialog");
@@ -410,7 +431,7 @@ describe("ReviewFlowPage", () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
     await user.click(screen.getByRole("button", { name: /Report fault for suggested line 4/i }));
 
     const dialog = screen.getByRole("dialog");
@@ -428,9 +449,220 @@ describe("ReviewFlowPage", () => {
     ).toBeInTheDocument();
   }, 10000);
 
+  it("stores reviewer profile answers and the backend review id while the review request is running", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL) => {
+        const url = input.toString();
+
+        if (url.endsWith("/snippets")) {
+          return jsonResponse({
+            snippets: [
+              {
+                id: snippetId,
+                language: "python",
+                context: "Linear algebra sample",
+                num_seeded_issues: 1,
+              },
+            ],
+          });
+        }
+
+        if (url.endsWith(`/snippets/${snippetId}`)) {
+          return jsonResponse({
+            id: snippetId,
+            language: "python",
+            context: "Linear algebra sample",
+            code: snippetCode,
+          });
+        }
+
+        if (url.endsWith("/review/specialist")) {
+          return new Promise((resolve) => {
+            window.setTimeout(() => {
+              resolve(
+                new Response(
+                  JSON.stringify({
+                    review_id: "api-review-123",
+                    mode: "specialist",
+                    snippet_id: snippetId,
+                    findings: [
+                      {
+                        id: "finding-1",
+                        role: "security",
+                        severity: "critical",
+                        confidence: "high",
+                        line: 4,
+                        title: "Unsafe dynamic evaluation detected",
+                        description: "Avoid eval here.",
+                        suggestion: "Use a safer parser.",
+                      },
+                    ],
+                    summary: "Backend review summary",
+                    metadata: {
+                      total_tokens: 100,
+                      latency_ms: 1200,
+                      agents_used: ["security"],
+                    },
+                  }),
+                  {
+                    status: 200,
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                  },
+                ),
+              );
+            }, 75);
+          });
+        }
+
+        return Promise.reject(new Error("offline"));
+      }),
+    );
+
+    const { user } = renderPage();
+
+    await prepareReview(user);
+    await user.click(screen.getByRole("button", { name: "Run Review" }));
+
+    await screen.findByRole("dialog");
+    const liveDialog = screen.getByRole("dialog");
+    const [roleSelect, toolSelect] = within(liveDialog).getAllByRole("combobox");
+    await user.selectOptions(roleSelect, "QA");
+    await user.type(within(liveDialog).getByPlaceholderText("e.g. 5"), "7");
+    await user.selectOptions(toolSelect, "ai_assistant");
+    await user.type(
+      within(liveDialog).getByPlaceholderText("Capture what matters most in code review for your team."),
+      "It protects delivery quality and catches risks early.",
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByRole("heading", { name: "Findings overview" })).toBeInTheDocument();
+
+    const [storedRun] = readStoredRuns();
+    expect(storedRun.reviewerProfile).toMatchObject({
+      role: "QA",
+      yearsOfExperience: 7,
+      usualReviewTool: "ai_assistant",
+      codeReviewImportance: "It protects delivery quality and catches risks early.",
+    });
+    expect(storedRun.submissionMetadata).toMatchObject({
+      apiReviewId: "api-review-123",
+      transportMode: "api",
+    });
+  }, 10000);
+
+  it("stores extra reviewer-only bugs added in phase 3", async () => {
+    window.localStorage.setItem(
+      reviewRunsStorageKey,
+      JSON.stringify([
+        {
+          id: "phase3-finding-run",
+          status: "completed",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:02:00.000Z",
+          currentStep: 3,
+          input: {
+            reviewMode: "multiple_agent",
+            selectedSnippetId: snippetId,
+            mainFiles: [
+              {
+                id: "main-1",
+                kind: "main",
+                name: `snippets/${snippetId}.py`,
+                content: snippetCode,
+                size: snippetCode.length,
+                uploadedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            supportingFiles: [],
+            developerNotes: [],
+            notes: "",
+          },
+          result: {
+            reviewRunId: "phase3-finding-run",
+            mode: "multiple_agent",
+            transportMode: "mock-fallback",
+            summaryText: "Legacy saved run",
+            issues: [
+              {
+                id: "issue-1",
+                title: "Unsafe dynamic evaluation detected",
+                severity: "critical",
+                roleName: "Security Agent",
+                filePath: `snippets/${snippetId}.py`,
+                lineNumber: 4,
+                locationLabel: `snippets/${snippetId}.py:4`,
+                description: "Legacy issue payload",
+                suggestion: "Use a safer parser instead of eval.",
+                originalSnippet: "result = eval('2 + 2')",
+                replacementSnippet: "safe_eval(result)",
+                sourceFileContent: snippetCode,
+                rationale: "Legacy rationale",
+                canRenderRichDiff: false,
+                noteMatchStatus: "unknown",
+                relatedNoteIds: [],
+                relatedNoteTitles: [],
+                feedback: {
+                  comments: [],
+                  suggestedLineReports: [],
+                },
+                rawMetadata: {},
+              },
+            ],
+            noteComparison: {
+              totalNotes: 0,
+              matchedNotes: 0,
+              unmatchedNotes: 0,
+              agentMatchedIssues: 0,
+              agentOnlyIssues: 1,
+              notes: [],
+            },
+            severityCounts: {
+              critical: 1,
+              high: 0,
+              medium: 0,
+              low: 0,
+            },
+            submittedAt: "2026-04-01T00:00:00.000Z",
+            supportsMultilineSource: false,
+            rawResponse: {},
+          },
+        },
+      ]),
+    );
+
+    const { user } = renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Select phase 3 line 4" }));
+    await user.type(screen.getByPlaceholderText("Bug title"), "Agent missed input validation risk");
+    await user.type(
+      screen.getByPlaceholderText("Why do you think this is a missed bug?"),
+      "The surrounding branch still accepts unsafe input paths.",
+    );
+    await user.click(screen.getByRole("button", { name: "Add Missed Bug" }));
+
+    expect(await screen.findByText("Agent missed input validation risk")).toBeInTheDocument();
+
+    const [storedRun] = readStoredRuns();
+    expect(storedRun.phase3Findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "Agent missed input validation risk",
+          filePath: `snippets/${snippetId}.py`,
+          lineStart: 4,
+          lineEnd: 4,
+          sourcePhase: 3,
+        }),
+      ]),
+    );
+  });
+
   it("tracks and shows total active time plus per-step time in the review flow header", async () => {
     window.localStorage.setItem(
-      "synthetic-architect.review-flow.runs",
+      reviewRunsStorageKey,
       JSON.stringify([
         {
           id: "timed-review-run",
@@ -512,7 +744,7 @@ describe("ReviewFlowPage", () => {
     ].join("\n");
 
     window.localStorage.setItem(
-      "synthetic-architect.review-flow.runs",
+      reviewRunsStorageKey,
       JSON.stringify([
         {
           id: "multi-collapse-run",
@@ -616,20 +848,23 @@ describe("ReviewFlowPage", () => {
 
     const { user } = renderPage();
 
-    const firstCollapsedSection = await screen.findByRole("button", { name: /Show 3 unchanged lines \(1-3\)/i });
-    expect(screen.getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
+    const combinedReview = await screen.findByRole("region", { name: /Combined file review for /i });
+    const firstCollapsedSection = within(combinedReview).getByRole("button", {
+      name: /Show 3 unchanged lines \(1-3\)/i,
+    });
+    expect(within(combinedReview).getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
 
     await user.click(firstCollapsedSection);
 
-    expect(screen.getByText("const alpha = 1;")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
+    expect(within(combinedReview).getByText("const alpha = 1;")).toBeInTheDocument();
+    expect(within(combinedReview).getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
   });
 
   it("validates and submits the survey modal with a max score of 3", async () => {
     const { user } = renderPage();
 
     await submitReview(user);
-    await user.click(screen.getByRole("button", { name: /Continue to Marker Review/i }));
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
     await user.click(screen.getByRole("button", { name: "Open Survey" }));
 
     const dialog = screen.getByRole("dialog");
@@ -641,7 +876,7 @@ describe("ReviewFlowPage", () => {
       name: /How useful was the Multiple Agent review mode for this run/i,
     });
     const clarityCard = within(dialog).getByRole("group", {
-      name: "How clear was the file-level code review in Step 3?",
+      name: "How clear was the file-level code review in Phase 3?",
     });
     const trustCard = within(dialog).getByRole("group", {
       name: "How much did you trust the suggested changes?",

@@ -5,6 +5,8 @@ import type {
   ReviewInputState,
   ReviewIssueViewModel,
   ReviewNoteComparisonSummary,
+  ReviewPhaseFinding,
+  ReviewReviewerProfile,
   ReviewResultViewModel,
   ReviewRunRecord,
   ReviewSeverityCounts,
@@ -39,8 +41,100 @@ function createEmptyInputState(): ReviewInputState {
   };
 }
 
+function createDefaultReviewerProfile(): ReviewReviewerProfile {
+  const now = new Date().toISOString();
+  return {
+    role: "DEV",
+    usualReviewTool: "github",
+    codeReviewImportance: "",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function normalizeReviewStepMetricsState(metrics?: Partial<ReviewStepMetrics> | null) {
   return normalizeReviewStepMetrics(metrics);
+}
+
+function normalizeReviewerProfile(profile?: Partial<ReviewReviewerProfile> | null): ReviewReviewerProfile | undefined {
+  if (!profile) {
+    return undefined;
+  }
+
+  const defaults = createDefaultReviewerProfile();
+  return {
+    ...defaults,
+    ...profile,
+    role:
+      profile.role === "DEV" || profile.role === "BA" || profile.role === "QA" || profile.role === "PM"
+        ? profile.role
+        : defaults.role,
+    usualReviewTool:
+      profile.usualReviewTool === "github" ||
+      profile.usualReviewTool === "gitlab" ||
+      profile.usualReviewTool === "azure_devops" ||
+      profile.usualReviewTool === "ide" ||
+      profile.usualReviewTool === "ai_assistant" ||
+      profile.usualReviewTool === "other"
+        ? profile.usualReviewTool
+        : defaults.usualReviewTool,
+    yearsOfExperience:
+      typeof profile.yearsOfExperience === "number" && Number.isFinite(profile.yearsOfExperience)
+        ? Math.max(0, Math.floor(profile.yearsOfExperience))
+        : undefined,
+    codeReviewImportance:
+      typeof profile.codeReviewImportance === "string" ? profile.codeReviewImportance : defaults.codeReviewImportance,
+    createdAt:
+      typeof profile.createdAt === "string" && profile.createdAt.trim().length > 0
+        ? profile.createdAt
+        : defaults.createdAt,
+    updatedAt:
+      typeof profile.updatedAt === "string" && profile.updatedAt.trim().length > 0
+        ? profile.updatedAt
+        : defaults.updatedAt,
+  };
+}
+
+function normalizeSubmissionMetadata(run: Partial<ReviewRunRecord>) {
+  const metadata = run.submissionMetadata;
+  if (!metadata) {
+    return undefined;
+  }
+
+  return {
+    apiReviewId:
+      typeof metadata.apiReviewId === "string" && metadata.apiReviewId.trim().length > 0
+        ? metadata.apiReviewId
+        : undefined,
+    transportMode: metadata.transportMode === "api" || metadata.transportMode === "mock-fallback"
+      ? metadata.transportMode
+      : undefined,
+    capturedAt:
+      typeof metadata.capturedAt === "string" && metadata.capturedAt.trim().length > 0
+        ? metadata.capturedAt
+        : undefined,
+  };
+}
+
+function normalizePhase3Findings(findings?: Partial<ReviewPhaseFinding>[] | null): ReviewPhaseFinding[] {
+  return Array.isArray(findings)
+    ? findings
+        .filter((finding): finding is Partial<ReviewPhaseFinding> => Boolean(finding))
+        .map((finding) => ({
+          id: typeof finding.id === "string" && finding.id.trim().length > 0 ? finding.id : createId("phase3-finding"),
+          title: typeof finding.title === "string" ? finding.title : "",
+          description: typeof finding.description === "string" ? finding.description : "",
+          filePath: typeof finding.filePath === "string" ? finding.filePath : "Unknown file",
+          lineStart: typeof finding.lineStart === "number" ? finding.lineStart : undefined,
+          lineEnd: typeof finding.lineEnd === "number" ? finding.lineEnd : undefined,
+          severityGuess: finding.severityGuess,
+          createdAt:
+            typeof finding.createdAt === "string" && finding.createdAt.trim().length > 0
+              ? finding.createdAt
+              : new Date().toISOString(),
+          sourcePhase: 3,
+        }))
+    : [];
 }
 
 function normalizeReviewInputState(input?: Partial<ReviewInputState> | null): ReviewInputState {
@@ -172,6 +266,9 @@ function normalizeReviewRun(run: Partial<ReviewRunRecord>): ReviewRunRecord {
     updatedAt: run.updatedAt ?? run.createdAt ?? now,
     currentStep: run.currentStep ?? 1,
     stepMetrics: normalizeReviewStepMetricsState(run.stepMetrics),
+    reviewerProfile: normalizeReviewerProfile(run.reviewerProfile),
+    submissionMetadata: normalizeSubmissionMetadata(run),
+    phase3Findings: normalizePhase3Findings(run.phase3Findings),
     input: normalizeReviewInputState(run.input),
     result: normalizeReviewResult(run.result),
     survey: normalizeReviewSurvey(run.survey),
@@ -214,6 +311,7 @@ function buildDraftRun(): ReviewRunRecord {
     updatedAt: now,
     currentStep: 1,
     stepMetrics: createEmptyReviewStepMetrics(),
+    phase3Findings: [],
     input: createEmptyInputState(),
   });
 }
@@ -296,6 +394,53 @@ export function setReviewRunCurrentStep(reviewRunId: string, step: ReviewFlowSte
   }));
 }
 
+export function ensureReviewerProfile(reviewRunId: string) {
+  return updateStoredReviewRun(reviewRunId, (run) => ({
+    ...run,
+    reviewerProfile: run.reviewerProfile ?? createDefaultReviewerProfile(),
+  }));
+}
+
+export function updateReviewerProfile(reviewRunId: string, input: Partial<ReviewReviewerProfile>) {
+  return updateStoredReviewRun(reviewRunId, (run) => {
+    const baseProfile = run.reviewerProfile ?? createDefaultReviewerProfile();
+    return {
+      ...run,
+      reviewerProfile: normalizeReviewerProfile({
+        ...baseProfile,
+        ...input,
+        createdAt: baseProfile.createdAt,
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+  });
+}
+
+export function addPhase3Finding(
+  reviewRunId: string,
+  finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">,
+) {
+  return updateStoredReviewRun(reviewRunId, (run) => ({
+    ...run,
+    phase3Findings: [
+      ...run.phase3Findings,
+      {
+        ...finding,
+        id: createId("phase3-finding"),
+        createdAt: new Date().toISOString(),
+        sourcePhase: 3,
+      },
+    ],
+  }));
+}
+
+export function removePhase3Finding(reviewRunId: string, findingId: string) {
+  return updateStoredReviewRun(reviewRunId, (run) => ({
+    ...run,
+    phase3Findings: run.phase3Findings.filter((finding) => finding.id !== findingId),
+  }));
+}
+
 export function resumeReviewRunStepTracking(reviewRunId: string, step: ReviewFlowStep) {
   return updateStoredReviewRun(reviewRunId, (run) => {
     const stepMetrics = normalizeReviewStepMetricsState(run.stepMetrics);
@@ -348,6 +493,8 @@ export async function submitReview(request: ReviewSubmitRequest) {
     ...baseRun,
     status: "running",
     currentStep: 2,
+    submissionMetadata: undefined,
+    phase3Findings: [],
     input: {
       reviewMode: request.reviewMode,
       selectedSnippetId: request.snippetId,
@@ -369,22 +516,28 @@ export async function submitReview(request: ReviewSubmitRequest) {
       response,
       transportMode: "api",
     });
+    const latestRun = getReviewRun(reviewRunId) ?? baseRun;
 
     return saveRun({
-      ...baseRun,
+      ...latestRun,
       status: "completed",
       currentStep: 2,
       input: {
         reviewMode: request.reviewMode,
         selectedSnippetId: request.snippetId,
-        selectedSnippet: baseRun.input.selectedSnippet,
+        selectedSnippet: latestRun.input.selectedSnippet,
         mainFiles: request.mainFiles,
         supportingFiles: request.supportingFiles,
         developerNotes: request.developerNotes,
         notes: request.notes ?? "",
       },
       result,
-      survey: baseRun.survey,
+      submissionMetadata: {
+        apiReviewId: result.transportMode === "api" ? result.backendReviewId : undefined,
+        transportMode: result.transportMode,
+        capturedAt: new Date().toISOString(),
+      },
+      survey: latestRun.survey,
       updatedAt: new Date().toISOString(),
       lastError: undefined,
     });
@@ -396,22 +549,28 @@ export async function submitReview(request: ReviewSubmitRequest) {
       response: fallback,
       transportMode: "mock-fallback",
     });
+    const latestRun = getReviewRun(reviewRunId) ?? baseRun;
 
     return saveRun({
-      ...baseRun,
+      ...latestRun,
       status: "completed",
       currentStep: 2,
       input: {
         reviewMode: request.reviewMode,
         selectedSnippetId: request.snippetId,
-        selectedSnippet: baseRun.input.selectedSnippet,
+        selectedSnippet: latestRun.input.selectedSnippet,
         mainFiles: request.mainFiles,
         supportingFiles: request.supportingFiles,
         developerNotes: request.developerNotes,
         notes: request.notes ?? "",
       },
       result,
-      survey: baseRun.survey,
+      submissionMetadata: {
+        apiReviewId: undefined,
+        transportMode: result.transportMode,
+        capturedAt: new Date().toISOString(),
+      },
+      survey: latestRun.survey,
       updatedAt: new Date().toISOString(),
       lastError: undefined,
     });
@@ -425,5 +584,9 @@ export const reviewService = {
   getOrCreateLatestReviewRun,
   createReviewDraft,
   updateReviewInput,
+  ensureReviewerProfile,
+  updateReviewerProfile,
+  addPhase3Finding,
+  removePhase3Finding,
   submitReview,
 };

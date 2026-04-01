@@ -5,6 +5,7 @@ import { Panel } from "@/components/common/Panel";
 import { EmptyStateBlock } from "@/components/review-flow/EmptyStateBlock";
 import { IssueCommentModal } from "@/components/review-flow/IssueCommentModal";
 import { LoadingBlock } from "@/components/review-flow/LoadingBlock";
+import { ReviewerProfileModal } from "@/components/review-flow/ReviewerProfileModal";
 import { ReviewStepHeader } from "@/components/review-flow/ReviewStepHeader";
 import { Step1InputSection } from "@/components/review-flow/Step1InputSection";
 import { Step2SummarySection } from "@/components/review-flow/Step2SummarySection";
@@ -60,6 +61,7 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
     selectedWrongResultIssue,
     selectedSuggestedLineFault,
     isSurveyModalOpen,
+    isReviewerProfileModalOpen,
     reportingIds,
     commentingIds,
     wrongResultIds,
@@ -67,6 +69,8 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
     isSubmittingSurvey,
     input,
     result,
+    reviewerProfile,
+    phase3Findings,
     survey,
     reloadSnippets,
     selectSnippet,
@@ -91,6 +95,11 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
     openSurveyModal,
     closeSurveyModal,
     submitSurvey,
+    openReviewerProfileModal,
+    closeReviewerProfileModal,
+    updateReviewerProfile,
+    addPhase3Finding,
+    removePhase3Finding,
   } = useReviewFlow({
     reviewRunId,
     initialStep,
@@ -135,7 +144,7 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
           {loadError ? <StatusBanner tone="error" message={loadError} /> : null}
           <EmptyStateBlock
             title="No review run available"
-            description="Create or open a review run first, then the 3-step review flow will become available."
+            description="Create or open a review run first, then the 3-phase review flow will become available."
           />
         </div>
       </AppShell>
@@ -152,9 +161,9 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
           <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary">Code review workflow</div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Three-step review flow</h1>
+              <h1 className="font-display text-4xl font-bold tracking-tight text-on-surface">Three-phase review flow</h1>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-on-surface-variant">
-                Submit review input, scan the summarized findings, and then inspect the marker review detail with feedback and survey actions.
+                Move through the input, summary, and marker review phases, then capture extra reviewer feedback and reporting metadata in the same frontend flow.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-sm">
@@ -172,6 +181,13 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
                   {result.transportMode === "api" ? "Backend result" : "Mock-safe fallback"}
                 </span>
               ) : null}
+              <button
+                type="button"
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-on-surface-variant transition-colors hover:border-white/20 hover:text-on-surface"
+                onClick={openReviewerProfileModal}
+              >
+                Reviewer Profile
+              </button>
             </div>
           </div>
         </div>
@@ -217,6 +233,8 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
         {currentStep === 3 ? (
           <Step3MarkerReviewSection
             result={result}
+            submittedFiles={input?.mainFiles}
+            phase3Findings={phase3Findings}
             commentingIds={commentingIds}
             wrongResultIds={wrongResultIds}
             suggestedLineFaultIds={suggestedLineFaultIds}
@@ -225,6 +243,8 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
             onOpenComment={openCommentModal}
             onOpenWrongResult={openWrongResultModal}
             onOpenSuggestedLineFault={openSuggestedLineFaultModal}
+            onAddPhase3Finding={addPhase3Finding}
+            onRemovePhase3Finding={removePhase3Finding}
           />
         ) : null}
       </div>
@@ -275,6 +295,14 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
         initialSurvey={survey}
         onClose={closeSurveyModal}
         onSubmit={submitSurvey}
+      />
+
+      <ReviewerProfileModal
+        open={isReviewerProfileModalOpen}
+        loading={isSubmitting}
+        profile={reviewerProfile}
+        onClose={closeReviewerProfileModal}
+        onChange={updateReviewerProfile}
       />
     </AppShell>
   );

@@ -11,7 +11,7 @@ export function AdditionalDocsSection(props: AdditionalDocsSectionProps) {
   return (
     <InputFilesSection
       {...props}
-      title="Additional documents / FSD"
+      title="Phase 1 · Step 4"
       description="Attach FSD, testcase packs, notes, or any supporting documents that make the review more accurate."
       helperText="Supporting uploads are optional and can include FSDs, testcase files, design notes, and review context."
       inputId="supporting-files-input"

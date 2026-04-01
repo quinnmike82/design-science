@@ -20,7 +20,7 @@ export function ReviewSummaryList({ issues, reportingIds, onReportFault, onConti
     return (
       <EmptyStateBlock
         title="No issues returned"
-        description="The review completed without any findings. You can still proceed to the marker review step if you want to inspect the fallback presentation."
+        description="The review completed without any findings. You can still proceed to the marker review phase if you want to inspect the fallback presentation."
       />
     );
   }
@@ -28,8 +28,11 @@ export function ReviewSummaryList({ issues, reportingIds, onReportFault, onConti
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-on-surface-variant">
-          {issues.length} issue{issues.length === 1 ? "" : "s"} returned
+        <div className="space-y-1">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 2 · Step 3</div>
+          <div className="text-sm text-on-surface-variant">
+            {issues.length} issue{issues.length === 1 ? "" : "s"} returned
+          </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button
@@ -40,7 +43,7 @@ export function ReviewSummaryList({ issues, reportingIds, onReportFault, onConti
             {allExpanded ? "Collapse all" : "Expand all"}
           </Button>
           <Button size="sm" onClick={onContinue}>
-            Continue to Marker Review
+            Continue to Marker Review Phase
             <ArrowRight className="size-4" />
           </Button>
         </div>

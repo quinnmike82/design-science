@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronsDownUp, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Panel } from "@/components/common/Panel";
+import { Phase3FindingPanel } from "@/components/review-flow/Phase3FindingPanel";
 import { WrongResultAction } from "@/components/review-flow/WrongResultAction";
-import type { ReviewIssueViewModel } from "@/models/review.types";
+import type { ReviewIssueViewModel, ReviewPhaseFinding } from "@/models/review.types";
 import { cn } from "@/utils/cn";
 
 export interface MarkerReviewFileGroup {
@@ -487,6 +488,7 @@ function buildFileDiffRows(group: MarkerReviewFileGroup) {
 
 interface CodeMarkerReviewCardProps {
   group: MarkerReviewFileGroup;
+  phase3Findings: ReviewPhaseFinding[];
   commentingIds: string[];
   wrongResultIds: string[];
   suggestedLineFaultIds: string[];
@@ -498,16 +500,21 @@ interface CodeMarkerReviewCardProps {
     lineText: string,
     suggestedLineNumber?: number,
   ) => void;
+  onAddPhase3Finding: (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => void;
+  onRemovePhase3Finding: (findingId: string) => void;
 }
 
 export function CodeMarkerReviewCard({
   group,
+  phase3Findings,
   commentingIds,
   wrongResultIds,
   suggestedLineFaultIds,
   onComment,
   onMarkWrong,
   onReportSuggestedLineFault,
+  onAddPhase3Finding,
+  onRemovePhase3Finding,
 }: CodeMarkerReviewCardProps) {
   const diff = buildFileDiffRows(group);
   const issueCountLabel = `${group.issues.length} flagged change${group.issues.length === 1 ? "" : "s"}`;
@@ -529,12 +536,12 @@ export function CodeMarkerReviewCard({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-            {group.filePath}
+            Phase 3 · Step 2
           </div>
           <h3 className="mt-2 font-display text-2xl font-semibold text-on-surface">File-level marker review</h3>
           <p className="mt-2 text-sm leading-6 text-on-surface-variant">
             All highlighted changes for this file are merged into one review box so the reviewer can read the full code
-            once and flag faulty suggestions only where needed.
+            once and flag faulty suggestions only where needed. File: {group.filePath}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -557,7 +564,10 @@ export function CodeMarkerReviewCard({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-surface-low/80">
+      <section
+        aria-label={`Combined file review for ${group.filePath}`}
+        className="overflow-hidden rounded-3xl border border-white/10 bg-surface-low/80"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
@@ -677,20 +687,13 @@ export function CodeMarkerReviewCard({
             })}
           </div>
         </div>
-      </div>
+      </section>
 
       {!diff.sourceAvailable || diff.unresolvedChangesCount > 0 ? (
         <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-on-surface-variant">
           {!diff.sourceAvailable
             ? "The backend did not provide the source file contents, so the review is rendered with the best available before/after rows."
             : "Some suggestions could not be mapped to an exact source line, so they were appended at the bottom of the same file review box."}
-        </div>
-      ) : null}
-
-      {diff.usedFrontendGeneratedReplacement ? (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-100">
-          Some green rows were generated directly by the frontend from the agent suggestion because backend replacement
-          blocks are not available yet.
         </div>
       ) : null}
 
@@ -707,10 +710,10 @@ export function CodeMarkerReviewCard({
       <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-            Flagged Changes
+            Phase 3 · Step 3
           </div>
           <div className="text-xs text-on-surface-variant">
-            Compact actions only. Issue descriptions stay in the Summary step.
+            Compact actions only. Issue descriptions stay in the summary phase.
           </div>
         </div>
 
@@ -774,10 +777,21 @@ export function CodeMarkerReviewCard({
         </div>
       </div>
 
+      <Phase3FindingPanel
+        filePath={group.filePath}
+        sourceFileContent={group.sourceFileContent}
+        findings={phase3Findings}
+        onAddFinding={onAddPhase3Finding}
+        onRemoveFinding={onRemovePhase3Finding}
+      />
+
       {group.issues.some((issue) => getSafeFeedback(issue).suggestedLineReports.length > 0) ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-            Reported Faulty Suggested Lines
+          <div className="space-y-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
+              Phase 3 · Step 5
+            </div>
+            <div className="font-medium text-on-surface">Reported Faulty Suggested Lines</div>
           </div>
           <div className="mt-3 space-y-3">
             {group.issues.flatMap((issue) =>

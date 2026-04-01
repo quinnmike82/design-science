@@ -6,19 +6,25 @@ import { useSurveySubmission } from "@/hooks/useSurveySubmission";
 import type { SuggestedLineFaultType } from "@/models/review-feedback.types";
 import type {
   ReviewFlowStep,
+  ReviewPhaseFinding,
   ReviewInputFile,
   ReviewInputState,
   ReviewIssueViewModel,
   ReviewLineNote,
+  ReviewReviewerProfile,
   ReviewSourceSnippetDetail,
   ReviewSourceSnippetSummary,
 } from "@/models/review.types";
 import type { SurveyFormValues } from "@/models/survey.types";
 import { reviewRunService } from "@/services/reviewRunService";
 import {
+  addPhase3Finding,
+  ensureReviewerProfile,
+  removePhase3Finding,
   pauseReviewRunStepTracking,
   resumeReviewRunStepTracking,
   setReviewRunCurrentStep,
+  updateReviewerProfile as persistReviewerProfile,
   updateReviewInput,
 } from "@/services/review.service";
 import { createId } from "@/utils/id";
@@ -96,6 +102,17 @@ async function readBrowserFiles(files: FileList | File[], kind: ReviewInputFile[
   );
 }
 
+function waitForNextPaint() {
+  return new Promise<void>((resolve) => {
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+
+    window.setTimeout(() => resolve(), 0);
+  });
+}
+
 export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions) {
   const { run, isLoading, error, setRun } = useReviewResults(reviewRunId);
   const { isSubmitting, submitError, submitReview } = useReviewSubmission();
@@ -118,6 +135,7 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
   const [selectedWrongResultIssue, setSelectedWrongResultIssue] = useState<ReviewIssueViewModel | null>(null);
   const [selectedSuggestedLineFault, setSelectedSuggestedLineFault] = useState<SuggestedLineFaultDraft | null>(null);
   const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false);
+  const [isReviewerProfileModalOpen, setIsReviewerProfileModalOpen] = useState(false);
   const [snippets, setSnippets] = useState<ReviewSourceSnippetSummary[]>([]);
   const [isSnippetLoading, setIsSnippetLoading] = useState(false);
   const [snippetError, setSnippetError] = useState<string | null>(null);
@@ -332,31 +350,40 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
       return;
     }
 
-    setRun(pauseReviewRunStepTracking(run.id));
+    const reviewRunWithProfile = ensureReviewerProfile(run.id);
+    setRun(reviewRunWithProfile);
+    setIsReviewerProfileModalOpen(true);
+    await waitForNextPaint();
+    setRun(pauseReviewRunStepTracking(reviewRunWithProfile.id));
 
-    const nextRun = await submitReview({
-      reviewRunId: run.id,
-      reviewMode: run.input.reviewMode,
-      snippetId: run.input.selectedSnippetId,
-      mainFiles: run.input.mainFiles,
-      supportingFiles: run.input.supportingFiles,
-      developerNotes: run.input.developerNotes,
-      notes: run.input.notes,
-    });
+    try {
+      const nextRun = await submitReview({
+        reviewRunId: reviewRunWithProfile.id,
+        reviewMode: reviewRunWithProfile.input.reviewMode!,
+        snippetId: reviewRunWithProfile.input.selectedSnippetId,
+        mainFiles: reviewRunWithProfile.input.mainFiles,
+        supportingFiles: reviewRunWithProfile.input.supportingFiles,
+        developerNotes: reviewRunWithProfile.input.developerNotes,
+        notes: reviewRunWithProfile.input.notes,
+      });
 
-    setRun(nextRun);
-    setCurrentStep(2);
-    setNotification(
-      nextRun.result?.transportMode === "mock-fallback"
-        ? {
-            tone: "warning",
-            message: "Backend review failed, so the summary was generated with the local fallback mapper.",
-          }
-        : {
-            tone: "success",
-            message: "Review submitted successfully.",
-          },
-    );
+      setRun(nextRun);
+      setCurrentStep(2);
+      setNotification(
+        nextRun.result?.transportMode === "mock-fallback"
+          ? {
+              tone: "warning",
+              message: "Backend review failed, so the summary was generated with the local fallback mapper.",
+            }
+          : {
+              tone: "success",
+              message: "Review submitted successfully.",
+            },
+      );
+    } finally {
+      // Keep the profile modal open until the reviewer dismisses it so fast API responses
+      // do not interrupt data entry or discard the chance to capture reviewer context.
+    }
   };
 
   const handleReportFault = async (issueId: string, reason?: string) => {
@@ -452,6 +479,34 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     });
   };
 
+  const handleUpdateReviewerProfile = (input: Partial<ReviewReviewerProfile>) => {
+    if (!run) {
+      return;
+    }
+
+    setRun(persistReviewerProfile(run.id, input));
+  };
+
+  const handleAddPhase3Finding = (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => {
+    if (!run) {
+      return;
+    }
+
+    setRun(addPhase3Finding(run.id, finding));
+    setNotification({
+      tone: "success",
+      message: "The extra reviewer bug was saved locally.",
+    });
+  };
+
+  const handleRemovePhase3Finding = (findingId: string) => {
+    if (!run) {
+      return;
+    }
+
+    setRun(removePhase3Finding(run.id, findingId));
+  };
+
   return {
     run,
     snippets,
@@ -470,6 +525,7 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     selectedWrongResultIssue,
     selectedSuggestedLineFault,
     isSurveyModalOpen,
+    isReviewerProfileModalOpen,
     reportingIds,
     commentingIds,
     wrongResultIds,
@@ -477,6 +533,8 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     isSubmittingSurvey,
     input: run?.input,
     result: run?.result,
+    reviewerProfile: run?.reviewerProfile,
+    phase3Findings: run?.phase3Findings ?? [],
     survey: run?.survey,
     reloadSnippets: loadSnippets,
     selectSnippet: handleSnippetChange,
@@ -507,5 +565,18 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     openSurveyModal: () => setIsSurveyModalOpen(true),
     closeSurveyModal: () => setIsSurveyModalOpen(false),
     submitSurvey: handleSubmitSurvey,
+    openReviewerProfileModal: () => {
+      if (!run) {
+        return;
+      }
+      setRun(ensureReviewerProfile(run.id));
+      setIsReviewerProfileModalOpen(true);
+    },
+    closeReviewerProfileModal: () => {
+      setIsReviewerProfileModalOpen(false);
+    },
+    updateReviewerProfile: handleUpdateReviewerProfile,
+    addPhase3Finding: handleAddPhase3Finding,
+    removePhase3Finding: handleRemovePhase3Finding,
   };
 }

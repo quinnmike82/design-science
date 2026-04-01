@@ -49,7 +49,7 @@ export function Step1InputSection({
     <div className="space-y-6">
       <Panel className="space-y-5">
         <div className="space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Choose review mode</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 1 · Step 1</div>
           <p className="text-sm leading-6 text-on-surface-variant">
             Pick the reviewer configuration for this run. The flow keeps the rest of the experience consistent.
           </p>
@@ -84,7 +84,7 @@ export function Step1InputSection({
 
       <Panel className="space-y-4">
         <div className="space-y-2">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Optional notes or context</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 1 · Step 5</div>
           <p className="text-sm leading-6 text-on-surface-variant">
             Add release context, risks, or guidance that helps the reviewer interpret the submitted changes.
           </p>
@@ -104,9 +104,10 @@ export function Step1InputSection({
             <FileCode2 className="size-5" />
           </div>
           <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">Phase 1 · Step 6</div>
             <div className="font-display text-2xl font-semibold text-on-surface">Submit review input</div>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
-              Submitting will move the run into the Summary step after a successful backend response or a mock-safe fallback result.
+              Submitting moves the run into the summary phase after a successful backend response or a mock-safe fallback result.
             </p>
           </div>
         </div>

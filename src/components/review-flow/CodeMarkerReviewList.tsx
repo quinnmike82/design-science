@@ -1,10 +1,12 @@
 import { Button } from "@/components/common/Button";
 import { CodeMarkerReviewCard, type MarkerReviewFileGroup } from "@/components/review-flow/CodeMarkerReviewCard";
 import { EmptyStateBlock } from "@/components/review-flow/EmptyStateBlock";
-import type { ReviewIssueViewModel } from "@/models/review.types";
+import type { ReviewInputFile, ReviewIssueViewModel, ReviewPhaseFinding } from "@/models/review.types";
 
 interface CodeMarkerReviewListProps {
   issues: ReviewIssueViewModel[];
+  submittedFiles: ReviewInputFile[];
+  phase3Findings: ReviewPhaseFinding[];
   commentingIds: string[];
   wrongResultIds: string[];
   suggestedLineFaultIds: string[];
@@ -18,10 +20,13 @@ interface CodeMarkerReviewListProps {
     lineText: string,
     suggestedLineNumber?: number,
   ) => void;
+  onAddPhase3Finding: (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => void;
+  onRemovePhase3Finding: (findingId: string) => void;
 }
 
-function groupIssuesByFile(issues: ReviewIssueViewModel[]): MarkerReviewFileGroup[] {
+function groupIssuesByFile(issues: ReviewIssueViewModel[], submittedFiles: ReviewInputFile[]): MarkerReviewFileGroup[] {
   const groups = new Map<string, MarkerReviewFileGroup>();
+  const submittedFileMap = new Map(submittedFiles.map((file) => [file.name, file.content]));
 
   issues.forEach((issue, index) => {
     const filePath = issue.filePath ?? `Unknown file ${index + 1}`;
@@ -29,15 +34,15 @@ function groupIssuesByFile(issues: ReviewIssueViewModel[]): MarkerReviewFileGrou
 
     if (existing) {
       existing.issues.push(issue);
-      if (!existing.sourceFileContent && issue.sourceFileContent) {
-        existing.sourceFileContent = issue.sourceFileContent;
+      if (!existing.sourceFileContent) {
+        existing.sourceFileContent = issue.sourceFileContent ?? submittedFileMap.get(filePath);
       }
       return;
     }
 
     groups.set(filePath, {
       filePath,
-      sourceFileContent: issue.sourceFileContent,
+      sourceFileContent: issue.sourceFileContent ?? submittedFileMap.get(filePath),
       issues: [issue],
     });
   });
@@ -47,6 +52,8 @@ function groupIssuesByFile(issues: ReviewIssueViewModel[]): MarkerReviewFileGrou
 
 export function CodeMarkerReviewList({
   issues,
+  submittedFiles,
+  phase3Findings,
   commentingIds,
   wrongResultIds,
   suggestedLineFaultIds,
@@ -55,23 +62,25 @@ export function CodeMarkerReviewList({
   onComment,
   onMarkWrong,
   onReportSuggestedLineFault,
+  onAddPhase3Finding,
+  onRemovePhase3Finding,
 }: CodeMarkerReviewListProps) {
   if (issues.length === 0) {
     return (
       <EmptyStateBlock
         title="No marker review data"
-        description="There are no issue details to render yet. Submit a review first, then this step will show the GitHub-like marker presentation."
+        description="There are no issue details to render yet. Submit a review first, then this phase will show the GitHub-like marker presentation."
       />
     );
   }
 
-  const fileGroups = groupIssuesByFile(issues);
+  const fileGroups = groupIssuesByFile(issues, submittedFiles);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" size="sm" onClick={onBackToSummary}>
-          Back to Summary
+          Back to Summary Phase
         </Button>
         <Button size="sm" onClick={onOpenSurvey}>
           Open Survey
@@ -85,9 +94,12 @@ export function CodeMarkerReviewList({
           commentingIds={commentingIds}
           wrongResultIds={wrongResultIds}
           suggestedLineFaultIds={suggestedLineFaultIds}
+          phase3Findings={phase3Findings.filter((finding) => finding.filePath === group.filePath)}
           onComment={onComment}
           onMarkWrong={onMarkWrong}
           onReportSuggestedLineFault={onReportSuggestedLineFault}
+          onAddPhase3Finding={onAddPhase3Finding}
+          onRemovePhase3Finding={onRemovePhase3Finding}
         />
       ))}
     </div>
