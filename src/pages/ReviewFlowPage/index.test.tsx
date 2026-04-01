@@ -302,7 +302,7 @@ describe("ReviewFlowPage", () => {
     const combinedReview = screen.getByRole("region", { name: /Combined file review for /i });
 
     expect(screen.getByText(/All highlighted changes for this file are merged into one review box/i)).toBeInTheDocument();
-    expect(screen.getByText(/Combined File Review/i)).toBeInTheDocument();
+    expect(within(combinedReview).getByText(/^Combined File Review$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Expand Unchanged Lines/i })).toBeInTheDocument();
     expect(within(combinedReview).getByRole("button", { name: /Show 3 unchanged lines \(1-3\)/i })).toBeInTheDocument();
     expect(within(combinedReview).queryByText("import numpy as np")).not.toBeInTheDocument();
@@ -636,7 +636,7 @@ describe("ReviewFlowPage", () => {
 
     const { user } = renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Select phase 3 line 4" }));
+    await user.click(await screen.findByRole("button", { name: "Anchor phase 3 line 4 from code" }));
     await user.type(screen.getByPlaceholderText("Bug title"), "Agent missed input validation risk");
     await user.type(
       screen.getByPlaceholderText("Why do you think this is a missed bug?"),

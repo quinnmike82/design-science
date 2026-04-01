@@ -486,6 +486,14 @@ function buildFileDiffRows(group: MarkerReviewFileGroup) {
   };
 }
 
+function getPhase3FindingSelectableLine(row: FileDiffRow) {
+  if (row.type === "added") {
+    return undefined;
+  }
+
+  return row.oldNumber ?? row.newNumber;
+}
+
 interface CodeMarkerReviewCardProps {
   group: MarkerReviewFileGroup;
   phase3Findings: ReviewPhaseFinding[];
@@ -520,6 +528,8 @@ export function CodeMarkerReviewCard({
   const issueCountLabel = `${group.issues.length} flagged change${group.issues.length === 1 ? "" : "s"}`;
   const collapsedContextKeys = useMemo(() => getCollapsedContextKeys(diff.rows), [diff.rows]);
   const [expandedContextKeys, setExpandedContextKeys] = useState<string[]>([]);
+  const [phase3FindingSelectionStart, setPhase3FindingSelectionStart] = useState<number | undefined>();
+  const [phase3FindingSelectionEnd, setPhase3FindingSelectionEnd] = useState<number | undefined>();
   const allContextSectionsExpanded =
     collapsedContextKeys.length > 0 && collapsedContextKeys.every((key) => expandedContextKeys.includes(key));
   const visibleRows = useMemo(
@@ -530,6 +540,38 @@ export function CodeMarkerReviewCard({
     [allContextSectionsExpanded, diff.rows, expandedContextKeys],
   );
   const hasCollapsedContext = visibleRows.some((row) => row.type === "collapsed-context");
+  const canSelectPhase3FindingLines = diff.rows.some((row) => getPhase3FindingSelectableLine(row) !== undefined);
+  const selectedPhase3FindingRange = useMemo(() => {
+    if (!phase3FindingSelectionStart) {
+      return undefined;
+    }
+
+    const end = phase3FindingSelectionEnd ?? phase3FindingSelectionStart;
+    return {
+      start: Math.min(phase3FindingSelectionStart, end),
+      end: Math.max(phase3FindingSelectionStart, end),
+    };
+  }, [phase3FindingSelectionEnd, phase3FindingSelectionStart]);
+
+  const clearPhase3FindingSelection = () => {
+    setPhase3FindingSelectionStart(undefined);
+    setPhase3FindingSelectionEnd(undefined);
+  };
+
+  const handleSelectPhase3FindingLine = (lineNumber: number, extendSelection: boolean) => {
+    if (!phase3FindingSelectionStart || !extendSelection) {
+      setPhase3FindingSelectionStart(lineNumber);
+      setPhase3FindingSelectionEnd(lineNumber);
+      return;
+    }
+
+    setPhase3FindingSelectionEnd(lineNumber);
+  };
+
+  const handleAddPhase3Finding = (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => {
+    onAddPhase3Finding(finding);
+    clearPhase3FindingSelection();
+  };
 
   return (
     <Panel className="space-y-5">
@@ -625,6 +667,13 @@ export function CodeMarkerReviewCard({
               const isReported = Boolean(row.reportedFault);
               const loadingId = row.issue && row.lineKey ? `${row.issue.id}:${row.lineKey}` : "";
               const isLoading = row.issue && row.lineKey ? suggestedLineFaultIds.includes(loadingId) : false;
+              const selectableLineNumber = getPhase3FindingSelectableLine(row);
+              const selectionColumn = row.type === "removed" ? "old" : "new";
+              const isPhase3FindingSelected =
+                selectableLineNumber !== undefined && selectedPhase3FindingRange
+                  ? selectableLineNumber >= selectedPhase3FindingRange.start &&
+                    selectableLineNumber <= selectedPhase3FindingRange.end
+                  : false;
 
               return (
                 <div
@@ -634,15 +683,65 @@ export function CodeMarkerReviewCard({
                     row.type === "removed" && "bg-error/10 text-[#ffd4dc]",
                     row.type === "added" && "bg-emerald-500/10 text-emerald-100",
                     row.type === "context" && "bg-transparent text-on-surface",
+                    isPhase3FindingSelected && "ring-1 ring-inset ring-primary/40",
                   )}
                 >
-                  <div className="px-3 py-2 text-right text-on-surface-variant/80">{row.oldNumber ?? ""}</div>
-                  <div className="px-3 py-2 text-right text-on-surface-variant/80">{row.newNumber ?? ""}</div>
+                  <div className="px-3 py-2 text-right text-on-surface-variant/80">
+                    {selectionColumn === "old" && selectableLineNumber !== undefined ? (
+                      <button
+                        type="button"
+                        aria-label={`Select phase 3 line ${selectableLineNumber}`}
+                        className={cn(
+                          "rounded px-1 transition-colors hover:text-on-surface",
+                          isPhase3FindingSelected ? "text-primary" : "text-on-surface-variant/80",
+                        )}
+                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                      >
+                        {row.oldNumber ?? selectableLineNumber}
+                      </button>
+                    ) : (
+                      row.oldNumber ?? ""
+                    )}
+                  </div>
+                  <div className="px-3 py-2 text-right text-on-surface-variant/80">
+                    {selectionColumn === "new" && selectableLineNumber !== undefined ? (
+                      <button
+                        type="button"
+                        aria-label={`Select phase 3 line ${selectableLineNumber}`}
+                        className={cn(
+                          "rounded px-1 transition-colors hover:text-on-surface",
+                          isPhase3FindingSelected ? "text-primary" : "text-on-surface-variant/80",
+                        )}
+                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                      >
+                        {row.newNumber ?? selectableLineNumber}
+                      </button>
+                    ) : (
+                      row.newNumber ?? ""
+                    )}
+                  </div>
                   <div className="px-4 py-2">
-                    <code className="block select-text whitespace-pre-wrap break-words">
-                      {row.type === "removed" ? "- " : row.type === "added" ? "+ " : "  "}
-                      {row.text || " "}
-                    </code>
+                    {selectableLineNumber !== undefined ? (
+                      <button
+                        type="button"
+                        aria-label={`Anchor phase 3 line ${selectableLineNumber} from code`}
+                        className={cn(
+                          "block w-full rounded px-1 py-0.5 text-left transition-colors hover:bg-white/5",
+                          isPhase3FindingSelected && "bg-primary/10",
+                        )}
+                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                      >
+                        <code className="block select-text whitespace-pre-wrap break-words">
+                          {row.type === "removed" ? "- " : row.type === "added" ? "+ " : "  "}
+                          {row.text || " "}
+                        </code>
+                      </button>
+                    ) : (
+                      <code className="block select-text whitespace-pre-wrap break-words">
+                        {row.type === "removed" ? "- " : row.type === "added" ? "+ " : "  "}
+                        {row.text || " "}
+                      </code>
+                    )}
                   </div>
                   <div className="flex items-center justify-end px-4 py-2">
                     {row.type === "added" && row.issue && row.lineKey ? (
@@ -686,6 +785,18 @@ export function CodeMarkerReviewCard({
               );
             })}
           </div>
+        </div>
+
+        <div className="border-t border-white/10 bg-black/10 px-4 py-4">
+          <Phase3FindingPanel
+            filePath={group.filePath}
+            canSelectLines={canSelectPhase3FindingLines}
+            findings={phase3Findings}
+            selectedRange={selectedPhase3FindingRange}
+            onAddFinding={handleAddPhase3Finding}
+            onRemoveFinding={onRemovePhase3Finding}
+            onClearSelection={clearPhase3FindingSelection}
+          />
         </div>
       </section>
 
@@ -777,19 +888,11 @@ export function CodeMarkerReviewCard({
         </div>
       </div>
 
-      <Phase3FindingPanel
-        filePath={group.filePath}
-        sourceFileContent={group.sourceFileContent}
-        findings={phase3Findings}
-        onAddFinding={onAddPhase3Finding}
-        onRemoveFinding={onRemovePhase3Finding}
-      />
-
       {group.issues.some((issue) => getSafeFeedback(issue).suggestedLineReports.length > 0) ? (
         <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
           <div className="space-y-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100">
-              Phase 3 · Step 5
+              Phase 3 Step 4
             </div>
             <div className="font-medium text-on-surface">Reported Faulty Suggested Lines</div>
           </div>
