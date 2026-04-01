@@ -15,7 +15,12 @@ import type {
 } from "@/models/review.types";
 import type { SurveyFormValues } from "@/models/survey.types";
 import { reviewRunService } from "@/services/reviewRunService";
-import { updateReviewInput, updateStoredReviewRun } from "@/services/review.service";
+import {
+  pauseReviewRunStepTracking,
+  resumeReviewRunStepTracking,
+  setReviewRunCurrentStep,
+  updateReviewInput,
+} from "@/services/review.service";
 import { createId } from "@/utils/id";
 
 interface FlowNotification {
@@ -126,6 +131,65 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     setCurrentStep(desiredStep);
   }, [initialStep, run]);
 
+  useEffect(() => {
+    if (!run) {
+      return;
+    }
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
+
+    const isAlreadyTrackingCurrentStep =
+      run.stepMetrics.activeStep === currentStep && Boolean(run.stepMetrics.activeStepEnteredAt);
+
+    if (isAlreadyTrackingCurrentStep) {
+      return;
+    }
+
+    setRun(resumeReviewRunStepTracking(run.id, currentStep));
+  }, [currentStep, isSubmitting, run, setRun]);
+
+  useEffect(() => {
+    if (!run || typeof document === "undefined") {
+      return;
+    }
+
+    const handleVisibilityChange = () => {
+      const updatedRun =
+        document.visibilityState === "visible" && !isSubmitting
+          ? resumeReviewRunStepTracking(run.id, currentStep)
+          : pauseReviewRunStepTracking(run.id);
+      setRun(updatedRun);
+    };
+
+    const handleBeforeUnload = () => {
+      pauseReviewRunStepTracking(run.id);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [currentStep, isSubmitting, run?.id, setRun]);
+
+  useEffect(() => {
+    if (!run) {
+      return;
+    }
+
+    return () => {
+      pauseReviewRunStepTracking(run.id);
+    };
+  }, [run?.id]);
+
   const updateInputState = (input: Partial<ReviewInputState>) => {
     if (!run) {
       return;
@@ -193,10 +257,7 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
 
     const maxStep = run.result ? 3 : 1;
     const safeStep = step > maxStep ? maxStep : step;
-    const updated = updateStoredReviewRun(run.id, (current) => ({
-      ...current,
-      currentStep: safeStep,
-    }));
+    const updated = setReviewRunCurrentStep(run.id, safeStep);
     setRun(updated);
     setCurrentStep(safeStep);
   };
@@ -270,6 +331,8 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
     if (!run || !run.input.reviewMode || !run.input.selectedSnippetId) {
       return;
     }
+
+    setRun(pauseReviewRunStepTracking(run.id));
 
     const nextRun = await submitReview({
       reviewRunId: run.id,

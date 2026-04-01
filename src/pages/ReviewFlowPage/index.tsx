@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleAlert } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Panel } from "@/components/common/Panel";
@@ -13,6 +14,8 @@ import { SurveyModal } from "@/components/review-flow/SurveyModal";
 import { useReviewFlow } from "@/hooks/useReviewFlow";
 import type { ReviewFlowStep } from "@/models/review.types";
 import { cn } from "@/utils/cn";
+import { formatDuration } from "@/utils/format";
+import { getReviewStepMetricsSnapshot } from "@/utils/reviewTiming";
 
 interface ReviewFlowPageProps {
   reviewRunId?: string | null;
@@ -39,6 +42,7 @@ function StatusBanner({ tone, message }: { tone: "success" | "warning" | "error"
 }
 
 export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageProps) {
+  const [timingNow, setTimingNow] = useState(() => Date.now());
   const {
     run,
     snippets,
@@ -92,6 +96,25 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
     initialStep,
   });
 
+  useEffect(() => {
+    if (!run?.stepMetrics.activeStep || !run.stepMetrics.activeStepEnteredAt) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setTimingNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [run?.stepMetrics.activeStep, run?.stepMetrics.activeStepEnteredAt]);
+
+  const timingSnapshot = useMemo(
+    () => getReviewStepMetricsSnapshot(run?.stepMetrics, new Date(timingNow).toISOString()),
+    [run?.stepMetrics, timingNow],
+  );
+
   if (isLoading) {
     return (
       <AppShell withSidebar>
@@ -141,6 +164,9 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-on-surface-variant">
                 Status: {run.status}
               </span>
+              <span className="rounded-full border border-secondary/25 bg-secondary/10 px-3 py-1 text-secondary">
+                Time spent: {formatDuration(timingSnapshot.totalActiveSec)}
+              </span>
               {result ? (
                 <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-primary">
                   {result.transportMode === "api" ? "Backend result" : "Mock-safe fallback"}
@@ -150,7 +176,12 @@ export function ReviewFlowPage({ reviewRunId, initialStep = 1 }: ReviewFlowPageP
           </div>
         </div>
 
-        <ReviewStepHeader currentStep={currentStep} maxAccessibleStep={maxAccessibleStep} onStepChange={goToStep} />
+        <ReviewStepHeader
+          currentStep={currentStep}
+          maxAccessibleStep={maxAccessibleStep}
+          stepTimesSec={timingSnapshot.stepTimesSec}
+          onStepChange={goToStep}
+        />
 
         {activeError ? <StatusBanner tone="error" message={activeError} /> : null}
         {notification ? <StatusBanner tone={notification.tone} message={notification.message} /> : null}

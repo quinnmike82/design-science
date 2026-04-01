@@ -122,12 +122,20 @@ export interface ReviewResultViewModel {
   rawResponse: unknown;
 }
 
+export interface ReviewStepMetrics {
+  totalActiveSec: number;
+  stepTimesSec: Record<ReviewFlowStep, number>;
+  activeStep?: ReviewFlowStep;
+  activeStepEnteredAt?: string;
+}
+
 export interface ReviewRunRecord {
   id: string;
   status: ReviewRunStatus;
   createdAt: string;
   updatedAt: string;
   currentStep: ReviewFlowStep;
+  stepMetrics: ReviewStepMetrics;
   input: ReviewInputState;
   result?: ReviewResultViewModel;
   survey?: ReviewSurvey;

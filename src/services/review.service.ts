@@ -9,10 +9,17 @@ import type {
   ReviewRunRecord,
   ReviewSeverityCounts,
   ReviewSubmitRequest,
+  ReviewStepMetrics,
 } from "@/models/review.types";
 import type { ReviewSurvey, SurveyPreferredMode, SurveyScore } from "@/models/survey.types";
 import { reviewApi } from "@/services/api/reviewApi";
 import { createId } from "@/utils/id";
+import {
+  activateReviewStepMetrics,
+  createEmptyReviewStepMetrics,
+  normalizeReviewStepMetrics,
+  pauseReviewStepMetrics,
+} from "@/utils/reviewTiming";
 
 const REVIEW_RUNS_STORAGE_KEY = "synthetic-architect.review-flow.runs";
 
@@ -30,6 +37,10 @@ function createEmptyInputState(): ReviewInputState {
     developerNotes: [],
     notes: "",
   };
+}
+
+function normalizeReviewStepMetricsState(metrics?: Partial<ReviewStepMetrics> | null) {
+  return normalizeReviewStepMetrics(metrics);
 }
 
 function normalizeReviewInputState(input?: Partial<ReviewInputState> | null): ReviewInputState {
@@ -160,6 +171,7 @@ function normalizeReviewRun(run: Partial<ReviewRunRecord>): ReviewRunRecord {
     createdAt: run.createdAt ?? now,
     updatedAt: run.updatedAt ?? run.createdAt ?? now,
     currentStep: run.currentStep ?? 1,
+    stepMetrics: normalizeReviewStepMetricsState(run.stepMetrics),
     input: normalizeReviewInputState(run.input),
     result: normalizeReviewResult(run.result),
     survey: normalizeReviewSurvey(run.survey),
@@ -201,11 +213,12 @@ function buildDraftRun(): ReviewRunRecord {
     createdAt: now,
     updatedAt: now,
     currentStep: 1,
+    stepMetrics: createEmptyReviewStepMetrics(),
     input: createEmptyInputState(),
   });
 }
 
-function saveRun(run: ReviewRunRecord) {
+function saveRun(run: Partial<ReviewRunRecord>) {
   const current = readStoredRuns();
   const normalizedRun = normalizeReviewRun(run);
   const next = current.some((item) => item.id === run.id)
@@ -272,6 +285,39 @@ export function updateReviewInput(reviewRunId: string, input: Partial<ReviewInpu
       notes: input.notes ?? run.input.notes,
       reviewMode: input.reviewMode ?? run.input.reviewMode,
     },
+  }));
+}
+
+export function setReviewRunCurrentStep(reviewRunId: string, step: ReviewFlowStep) {
+  return updateStoredReviewRun(reviewRunId, (run) => ({
+    ...run,
+    currentStep: step,
+    stepMetrics: activateReviewStepMetrics(run.stepMetrics, step),
+  }));
+}
+
+export function resumeReviewRunStepTracking(reviewRunId: string, step: ReviewFlowStep) {
+  return updateStoredReviewRun(reviewRunId, (run) => {
+    const stepMetrics = normalizeReviewStepMetricsState(run.stepMetrics);
+    const alreadyTrackingCurrentStep =
+      stepMetrics.activeStep === step && Boolean(stepMetrics.activeStepEnteredAt);
+
+    return alreadyTrackingCurrentStep
+      ? {
+          ...run,
+          stepMetrics,
+        }
+      : {
+          ...run,
+          stepMetrics: activateReviewStepMetrics(stepMetrics, step),
+        };
+  });
+}
+
+export function pauseReviewRunStepTracking(reviewRunId: string) {
+  return updateStoredReviewRun(reviewRunId, (run) => ({
+    ...run,
+    stepMetrics: pauseReviewStepMetrics(run.stepMetrics),
   }));
 }
 

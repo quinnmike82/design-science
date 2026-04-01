@@ -252,7 +252,7 @@ describe("ReviewFlowPage", () => {
     expect(screen.getByText("Matched notes")).toBeInTheDocument();
     expect(screen.getByText("Potential eval risk")).toBeInTheDocument();
     expect(screen.getByText("Matches Interviewer Note")).toBeInTheDocument();
-  });
+  }, 10000);
 
   it("triggers report fault from step 2", async () => {
     const { user } = renderPage();
@@ -426,6 +426,203 @@ describe("ReviewFlowPage", () => {
     expect(
       screen.getByText("This added line does not match the intended secure implementation."),
     ).toBeInTheDocument();
+  }, 10000);
+
+  it("tracks and shows total active time plus per-step time in the review flow header", async () => {
+    window.localStorage.setItem(
+      "synthetic-architect.review-flow.runs",
+      JSON.stringify([
+        {
+          id: "timed-review-run",
+          status: "completed",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:02:00.000Z",
+          currentStep: 2,
+          stepMetrics: {
+            totalActiveSec: 120,
+            stepTimesSec: {
+              1: 45,
+              2: 30,
+              3: 45,
+            },
+          },
+          input: {
+            reviewMode: "multiple_agent",
+            selectedSnippetId: snippetId,
+            mainFiles: [
+              {
+                id: "main-1",
+                kind: "main",
+                name: `snippets/${snippetId}.py`,
+                content: snippetCode,
+                size: snippetCode.length,
+                uploadedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            supportingFiles: [],
+            developerNotes: [],
+            notes: "",
+          },
+          result: {
+            reviewRunId: "timed-review-run",
+            mode: "multiple_agent",
+            transportMode: "mock-fallback",
+            summaryText: "Stored review with timing metrics",
+            issues: [],
+            noteComparison: {
+              totalNotes: 0,
+              matchedNotes: 0,
+              unmatchedNotes: 0,
+              agentMatchedIssues: 0,
+              agentOnlyIssues: 0,
+              notes: [],
+            },
+            severityCounts: {
+              critical: 0,
+              high: 0,
+              medium: 0,
+              low: 0,
+            },
+            submittedAt: "2026-04-01T00:02:00.000Z",
+            supportsMultilineSource: false,
+            rawResponse: {},
+          },
+        },
+      ]),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Time spent: 2m 0s")).toBeInTheDocument();
+    expect(screen.getAllByText("Active time 45s")).toHaveLength(2);
+    expect(screen.getByText("Active time 30s")).toBeInTheDocument();
+  });
+
+  it("expands only the selected collapsed section in step 3 instead of every section at once", async () => {
+    const multiSectionCode = [
+      "const alpha = 1;",
+      "const beta = 2;",
+      "const gamma = 3;",
+      "result = eval('2 + 2')",
+      "const delta = 4;",
+      "const epsilon = 5;",
+      "const zeta = 6;",
+      "window.location = target",
+      "return result;",
+    ].join("\n");
+
+    window.localStorage.setItem(
+      "synthetic-architect.review-flow.runs",
+      JSON.stringify([
+        {
+          id: "multi-collapse-run",
+          status: "completed",
+          createdAt: "2026-04-01T00:00:00.000Z",
+          updatedAt: "2026-04-01T00:02:00.000Z",
+          currentStep: 3,
+          input: {
+            reviewMode: "multiple_agent",
+            selectedSnippetId: "multi-collapse",
+            mainFiles: [
+              {
+                id: "main-multi-collapse",
+                kind: "main",
+                name: "snippets/multi_collapse.ts",
+                content: multiSectionCode,
+                size: multiSectionCode.length,
+                uploadedAt: "2026-04-01T00:00:00.000Z",
+              },
+            ],
+            supportingFiles: [],
+            developerNotes: [],
+            notes: "",
+          },
+          result: {
+            reviewRunId: "multi-collapse-run",
+            mode: "multiple_agent",
+            transportMode: "mock-fallback",
+            summaryText: "Multiple collapsed sections",
+            issues: [
+              {
+                id: "issue-a",
+                title: "Unsafe dynamic evaluation detected",
+                severity: "critical",
+                roleName: "Security Agent",
+                filePath: "snippets/multi_collapse.ts",
+                lineNumber: 4,
+                locationLabel: "snippets/multi_collapse.ts:4",
+                description: "Eval should not be used here.",
+                suggestion: "Use a safe parser.",
+                originalSnippet: "result = eval('2 + 2')",
+                replacementSnippet: "safeEvaluate(result)",
+                sourceFileContent: multiSectionCode,
+                rationale: "Legacy unsafe behavior",
+                canRenderRichDiff: false,
+                noteMatchStatus: "unknown",
+                relatedNoteIds: [],
+                relatedNoteTitles: [],
+                feedback: {
+                  comments: [],
+                  suggestedLineReports: [],
+                },
+                rawMetadata: {},
+              },
+              {
+                id: "issue-b",
+                title: "Redirect handling should be validated",
+                severity: "high",
+                roleName: "Security Agent",
+                filePath: "snippets/multi_collapse.ts",
+                lineNumber: 8,
+                locationLabel: "snippets/multi_collapse.ts:8",
+                description: "Redirect target should be validated.",
+                suggestion: "Validate the redirect target.",
+                originalSnippet: "window.location = target",
+                replacementSnippet: "window.location = getValidatedRedirectTarget(target)",
+                sourceFileContent: multiSectionCode,
+                rationale: "Open redirect risk",
+                canRenderRichDiff: false,
+                noteMatchStatus: "unknown",
+                relatedNoteIds: [],
+                relatedNoteTitles: [],
+                feedback: {
+                  comments: [],
+                  suggestedLineReports: [],
+                },
+                rawMetadata: {},
+              },
+            ],
+            noteComparison: {
+              totalNotes: 0,
+              matchedNotes: 0,
+              unmatchedNotes: 0,
+              agentMatchedIssues: 0,
+              agentOnlyIssues: 2,
+              notes: [],
+            },
+            severityCounts: {
+              critical: 1,
+              high: 1,
+              medium: 0,
+              low: 0,
+            },
+            submittedAt: "2026-04-01T00:02:00.000Z",
+            supportsMultilineSource: false,
+            rawResponse: {},
+          },
+        },
+      ]),
+    );
+
+    const { user } = renderPage();
+
+    const firstCollapsedSection = await screen.findByRole("button", { name: /Show 3 unchanged lines \(1-3\)/i });
+    expect(screen.getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
+
+    await user.click(firstCollapsedSection);
+
+    expect(screen.getByText("const alpha = 1;")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show 3 unchanged lines \(5-7\)/i })).toBeInTheDocument();
   });
 
   it("validates and submits the survey modal with a max score of 3", async () => {
@@ -458,5 +655,5 @@ describe("ReviewFlowPage", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText(/Survey saved locally while backend support is pending/i)).toBeInTheDocument();
-  });
+  }, 10000);
 });

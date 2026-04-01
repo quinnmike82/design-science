@@ -1,4 +1,5 @@
 import type { ReviewFlowStep } from "@/models/review.types";
+import { formatDuration } from "@/utils/format";
 import { cn } from "@/utils/cn";
 
 const steps: Array<{ id: ReviewFlowStep; label: string; title: string }> = [
@@ -10,10 +11,11 @@ const steps: Array<{ id: ReviewFlowStep; label: string; title: string }> = [
 interface ReviewStepHeaderProps {
   currentStep: ReviewFlowStep;
   maxAccessibleStep: ReviewFlowStep;
+  stepTimesSec?: Record<ReviewFlowStep, number>;
   onStepChange: (step: ReviewFlowStep) => void;
 }
 
-export function ReviewStepHeader({ currentStep, maxAccessibleStep, onStepChange }: ReviewStepHeaderProps) {
+export function ReviewStepHeader({ currentStep, maxAccessibleStep, stepTimesSec, onStepChange }: ReviewStepHeaderProps) {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       {steps.map((step) => {
@@ -42,6 +44,9 @@ export function ReviewStepHeader({ currentStep, maxAccessibleStep, onStepChange 
                   {step.label}
                 </div>
                 <div className="mt-2 font-display text-2xl font-semibold text-on-surface">{step.title}</div>
+                <div className="mt-2 text-xs text-on-surface-variant">
+                  Active time {formatDuration(stepTimesSec?.[step.id])}
+                </div>
               </div>
               <div
                 className={cn(

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, ChevronsDownUp, ChevronsUpDown, MessageSquare } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Panel } from "@/components/common/Panel";
@@ -213,6 +213,71 @@ function buildVisibleRows(rows: FileDiffRow[], showUnchangedLines: boolean): Vis
     visibleRows.push({
       type: "collapsed-context",
       key: `collapsed-${hiddenRows[0].key}`,
+      hiddenCount: hiddenRows.length,
+      startLine: hiddenRows[0].newNumber,
+      endLine: hiddenRows[hiddenRows.length - 1].newNumber,
+    });
+  }
+
+  return visibleRows;
+}
+
+function getCollapsedContextKeys(rows: FileDiffRow[]) {
+  const keys: string[] = [];
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (!isCollapsibleContextRow(row)) {
+      continue;
+    }
+
+    const startIndex = index;
+    while (index + 1 < rows.length && isCollapsibleContextRow(rows[index + 1])) {
+      index += 1;
+    }
+
+    const hiddenRows = rows.slice(startIndex, index + 1);
+    keys.push(`collapsed-${hiddenRows[0].key}`);
+  }
+
+  return keys;
+}
+
+function buildVisibleRowsWithExpandedSections(rows: FileDiffRow[], expandedContextKeys: string[]): VisibleDiffRow[] {
+  const expandedKeys = new Set(expandedContextKeys);
+  const visibleRows: VisibleDiffRow[] = [];
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (!isCollapsibleContextRow(row)) {
+      visibleRows.push({
+        type: "row",
+        row,
+      });
+      continue;
+    }
+
+    const startIndex = index;
+    while (index + 1 < rows.length && isCollapsibleContextRow(rows[index + 1])) {
+      index += 1;
+    }
+
+    const hiddenRows = rows.slice(startIndex, index + 1);
+    const collapsedKey = `collapsed-${hiddenRows[0].key}`;
+
+    if (expandedKeys.has(collapsedKey)) {
+      hiddenRows.forEach((hiddenRow) => {
+        visibleRows.push({
+          type: "row",
+          row: hiddenRow,
+        });
+      });
+      continue;
+    }
+
+    visibleRows.push({
+      type: "collapsed-context",
+      key: collapsedKey,
       hiddenCount: hiddenRows.length,
       startLine: hiddenRows[0].newNumber,
       endLine: hiddenRows[hiddenRows.length - 1].newNumber,
@@ -446,8 +511,17 @@ export function CodeMarkerReviewCard({
 }: CodeMarkerReviewCardProps) {
   const diff = buildFileDiffRows(group);
   const issueCountLabel = `${group.issues.length} flagged change${group.issues.length === 1 ? "" : "s"}`;
-  const [showUnchangedLines, setShowUnchangedLines] = useState(false);
-  const visibleRows = buildVisibleRows(diff.rows, showUnchangedLines);
+  const collapsedContextKeys = useMemo(() => getCollapsedContextKeys(diff.rows), [diff.rows]);
+  const [expandedContextKeys, setExpandedContextKeys] = useState<string[]>([]);
+  const allContextSectionsExpanded =
+    collapsedContextKeys.length > 0 && collapsedContextKeys.every((key) => expandedContextKeys.includes(key));
+  const visibleRows = useMemo(
+    () =>
+      allContextSectionsExpanded
+        ? buildVisibleRows(diff.rows, true)
+        : buildVisibleRowsWithExpandedSections(diff.rows, expandedContextKeys),
+    [allContextSectionsExpanded, diff.rows, expandedContextKeys],
+  );
   const hasCollapsedContext = visibleRows.some((row) => row.type === "collapsed-context");
 
   return (
@@ -467,9 +541,13 @@ export function CodeMarkerReviewCard({
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
             {issueCountLabel}
           </span>
-          <Button variant="outline" size="sm" onClick={() => setShowUnchangedLines((current) => !current)}>
-            {showUnchangedLines ? <ChevronsDownUp className="size-4" /> : <ChevronsUpDown className="size-4" />}
-            {showUnchangedLines ? "Collapse Unchanged Lines" : "Expand Unchanged Lines"}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExpandedContextKeys(allContextSectionsExpanded ? [] : collapsedContextKeys)}
+          >
+            {allContextSectionsExpanded ? <ChevronsDownUp className="size-4" /> : <ChevronsUpDown className="size-4" />}
+            {allContextSectionsExpanded ? "Collapse Unchanged Lines" : "Expand Unchanged Lines"}
           </Button>
           {diff.unresolvedChangesCount > 0 ? (
             <span className="rounded-full border border-tertiary/25 bg-tertiary/10 px-3 py-1 text-xs text-tertiary">
@@ -496,7 +574,7 @@ export function CodeMarkerReviewCard({
         </div>
 
         <div className="overflow-x-auto">
-          <div className="min-w-[1080px]">
+          <div className="min-w-[980px]">
             <div className="grid grid-cols-[72px_72px_minmax(0,1fr)_260px] border-b border-white/10 bg-black/20 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
               <div className="px-3 py-3 text-right">Old</div>
               <div className="px-3 py-3 text-right">New</div>
@@ -515,7 +593,11 @@ export function CodeMarkerReviewCard({
                       <button
                         type="button"
                         className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-medium hover:border-white/20 hover:text-on-surface"
-                        onClick={() => setShowUnchangedLines(true)}
+                        onClick={() =>
+                          setExpandedContextKeys((current) =>
+                            current.includes(visibleRow.key) ? current : [...current, visibleRow.key],
+                          )
+                        }
                       >
                         <ChevronsUpDown className="size-4" />
                         {`Show ${visibleRow.hiddenCount} unchanged line${visibleRow.hiddenCount === 1 ? "" : "s"}${
@@ -546,8 +628,8 @@ export function CodeMarkerReviewCard({
                 >
                   <div className="px-3 py-2 text-right text-on-surface-variant/80">{row.oldNumber ?? ""}</div>
                   <div className="px-3 py-2 text-right text-on-surface-variant/80">{row.newNumber ?? ""}</div>
-                  <div className="overflow-x-auto px-4 py-2">
-                    <code className="block whitespace-pre">
+                  <div className="px-4 py-2">
+                    <code className="block select-text whitespace-pre-wrap break-words">
                       {row.type === "removed" ? "- " : row.type === "added" ? "+ " : "  "}
                       {row.text || " "}
                     </code>
@@ -555,7 +637,7 @@ export function CodeMarkerReviewCard({
                   <div className="flex items-center justify-end px-4 py-2">
                     {row.type === "added" && row.issue && row.lineKey ? (
                       <div className="flex w-full items-center justify-between gap-3">
-                        <div className="truncate text-[11px] text-emerald-100/90">{row.issue.title}</div>
+                        <div className="text-[11px] leading-5 text-emerald-100/90">{row.issue.title}</div>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -612,7 +694,7 @@ export function CodeMarkerReviewCard({
         </div>
       ) : null}
 
-      {!showUnchangedLines && hasCollapsedContext ? (
+      {!allContextSectionsExpanded && hasCollapsedContext ? (
         <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-on-surface-variant">
           Unchanged lines are collapsed by default to keep the review focused on modified rows. Use
           {" "}
@@ -714,7 +796,7 @@ export function CodeMarkerReviewCard({
                       {faultTypeLabels[report.faultType]}
                     </span>
                   </div>
-                  <pre className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-surface-low/80 px-4 py-3 font-mono text-xs leading-6 text-on-surface">
+                  <pre className="mt-3 rounded-2xl border border-white/10 bg-surface-low/80 px-4 py-3 font-mono text-xs leading-6 text-on-surface whitespace-pre-wrap break-words">
                     <code>{report.lineText}</code>
                   </pre>
                   {report.commentText ? (
