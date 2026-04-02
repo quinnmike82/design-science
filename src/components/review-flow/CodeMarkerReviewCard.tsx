@@ -530,6 +530,7 @@ export function CodeMarkerReviewCard({
   const [expandedContextKeys, setExpandedContextKeys] = useState<string[]>([]);
   const [phase3FindingSelectionStart, setPhase3FindingSelectionStart] = useState<number | undefined>();
   const [phase3FindingSelectionEnd, setPhase3FindingSelectionEnd] = useState<number | undefined>();
+  const [isPhase3FindingRangeSelecting, setIsPhase3FindingRangeSelecting] = useState(false);
   const allContextSectionsExpanded =
     collapsedContextKeys.length > 0 && collapsedContextKeys.every((key) => expandedContextKeys.includes(key));
   const visibleRows = useMemo(
@@ -556,12 +557,23 @@ export function CodeMarkerReviewCard({
   const clearPhase3FindingSelection = () => {
     setPhase3FindingSelectionStart(undefined);
     setPhase3FindingSelectionEnd(undefined);
+    setIsPhase3FindingRangeSelecting(false);
   };
 
-  const handleSelectPhase3FindingLine = (lineNumber: number, extendSelection: boolean) => {
-    if (!phase3FindingSelectionStart || !extendSelection) {
+  const handleSelectPhase3FindingLine = (lineNumber: number) => {
+    if (!phase3FindingSelectionStart || !isPhase3FindingRangeSelecting) {
       setPhase3FindingSelectionStart(lineNumber);
       setPhase3FindingSelectionEnd(lineNumber);
+      setIsPhase3FindingRangeSelecting(true);
+      return;
+    }
+
+    setPhase3FindingSelectionEnd(lineNumber);
+    setIsPhase3FindingRangeSelecting(false);
+  };
+
+  const handlePreviewPhase3FindingLine = (lineNumber: number) => {
+    if (!phase3FindingSelectionStart || !isPhase3FindingRangeSelecting) {
       return;
     }
 
@@ -608,7 +620,7 @@ export function CodeMarkerReviewCard({
 
       <section
         aria-label={`Combined file review for ${group.filePath}`}
-        className="overflow-hidden rounded-3xl border border-white/10 bg-surface-low/80"
+        className="rounded-3xl border border-white/10 bg-surface-low/80"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
@@ -625,8 +637,9 @@ export function CodeMarkerReviewCard({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <div className="min-w-[980px]">
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+          <div className="min-w-0 overflow-x-auto">
+            <div className="min-w-[980px]">
             <div className="grid grid-cols-[72px_72px_minmax(0,1fr)_260px] border-b border-white/10 bg-black/20 text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">
               <div className="px-3 py-3 text-right">Old</div>
               <div className="px-3 py-3 text-right">New</div>
@@ -634,7 +647,7 @@ export function CodeMarkerReviewCard({
               <div className="px-4 py-3">Reviewer Action</div>
             </div>
 
-            {visibleRows.map((visibleRow) => {
+              {visibleRows.map((visibleRow) => {
               if (visibleRow.type === "collapsed-context") {
                 return (
                   <div
@@ -695,7 +708,8 @@ export function CodeMarkerReviewCard({
                           "rounded px-1 transition-colors hover:text-on-surface",
                           isPhase3FindingSelected ? "text-primary" : "text-on-surface-variant/80",
                         )}
-                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                        onClick={() => handleSelectPhase3FindingLine(selectableLineNumber)}
+                        onMouseEnter={() => handlePreviewPhase3FindingLine(selectableLineNumber)}
                       >
                         {row.oldNumber ?? selectableLineNumber}
                       </button>
@@ -712,7 +726,8 @@ export function CodeMarkerReviewCard({
                           "rounded px-1 transition-colors hover:text-on-surface",
                           isPhase3FindingSelected ? "text-primary" : "text-on-surface-variant/80",
                         )}
-                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                        onClick={() => handleSelectPhase3FindingLine(selectableLineNumber)}
+                        onMouseEnter={() => handlePreviewPhase3FindingLine(selectableLineNumber)}
                       >
                         {row.newNumber ?? selectableLineNumber}
                       </button>
@@ -729,7 +744,8 @@ export function CodeMarkerReviewCard({
                           "block w-full rounded px-1 py-0.5 text-left transition-colors hover:bg-white/5",
                           isPhase3FindingSelected && "bg-primary/10",
                         )}
-                        onClick={(event) => handleSelectPhase3FindingLine(selectableLineNumber, event.shiftKey)}
+                        onClick={() => handleSelectPhase3FindingLine(selectableLineNumber)}
+                        onMouseEnter={() => handlePreviewPhase3FindingLine(selectableLineNumber)}
                       >
                         <code className="block select-text whitespace-pre-wrap break-words">
                           {row.type === "removed" ? "- " : row.type === "added" ? "+ " : "  "}
@@ -783,20 +799,24 @@ export function CodeMarkerReviewCard({
                   </div>
                 </div>
               );
-            })}
+              })}
+            </div>
           </div>
-        </div>
 
-        <div className="border-t border-white/10 bg-black/10 px-4 py-4">
-          <Phase3FindingPanel
-            filePath={group.filePath}
-            canSelectLines={canSelectPhase3FindingLines}
-            findings={phase3Findings}
-            selectedRange={selectedPhase3FindingRange}
-            onAddFinding={handleAddPhase3Finding}
-            onRemoveFinding={onRemovePhase3Finding}
-            onClearSelection={clearPhase3FindingSelection}
-          />
+          <aside className="border-t border-white/10 bg-black/10 xl:border-l xl:border-t-0">
+            <div className="p-4 xl:sticky xl:top-6">
+              <Phase3FindingPanel
+                filePath={group.filePath}
+                canSelectLines={canSelectPhase3FindingLines}
+                findings={phase3Findings}
+                isRangeSelecting={isPhase3FindingRangeSelecting}
+                selectedRange={selectedPhase3FindingRange}
+                onAddFinding={handleAddPhase3Finding}
+                onRemoveFinding={onRemovePhase3Finding}
+                onClearSelection={clearPhase3FindingSelection}
+              />
+            </div>
+          </aside>
         </div>
       </section>
 

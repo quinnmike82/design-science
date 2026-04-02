@@ -241,6 +241,39 @@ describe("ReviewFlowPage", () => {
     await waitFor(() => expect(runButton).toBeEnabled());
   });
 
+  it("supports hover-based multi-line selection in phase 1 before adding a reviewer note", async () => {
+    const { user } = renderPage();
+
+    await screen.findByRole("button", { name: "Select line 4" });
+
+    await user.click(screen.getByRole("button", { name: "Select line 2" }));
+    await user.hover(screen.getByRole("button", { name: "Anchor line 4 from code" }));
+    await user.click(screen.getByRole("button", { name: "Select line 4" }));
+
+    expect(screen.getByText(/Selected lines 2-4/i)).toBeInTheDocument();
+    expect(screen.getByText(/Anchored to snippets\/snippet_algebra\.py:2-4/i)).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Issue title"), "Range-based reviewer note");
+    await user.type(
+      screen.getByPlaceholderText(/Why do you think this is a problem/i),
+      "The surrounding logic across these lines needs to be reviewed together.",
+    );
+    await user.click(screen.getByRole("button", { name: "Add Review Comment" }));
+
+    expect(await screen.findByText("Range-based reviewer note")).toBeInTheDocument();
+
+    const [storedRun] = readStoredRuns();
+    expect(storedRun.input).toMatchObject({
+      developerNotes: expect.arrayContaining([
+        expect.objectContaining({
+          title: "Range-based reviewer note",
+          lineStart: 2,
+          lineEnd: 4,
+        }),
+      ]),
+    });
+  });
+
   it("moves from submit flow to step 2 with the backend snippet contract and fallback summary", async () => {
     const { user } = renderPage();
 
@@ -636,7 +669,10 @@ describe("ReviewFlowPage", () => {
 
     const { user } = renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Anchor phase 3 line 4 from code" }));
+    await user.click(await screen.findByRole("button", { name: /Expand Unchanged Lines/i }));
+    await user.click(await screen.findByRole("button", { name: "Anchor phase 3 line 3 from code" }));
+    await user.hover(screen.getByRole("button", { name: "Anchor phase 3 line 4 from code" }));
+    await user.click(screen.getByRole("button", { name: "Select phase 3 line 4" }));
     await user.type(screen.getByPlaceholderText("Bug title"), "Agent missed input validation risk");
     await user.type(
       screen.getByPlaceholderText("Why do you think this is a missed bug?"),
@@ -652,7 +688,7 @@ describe("ReviewFlowPage", () => {
         expect.objectContaining({
           title: "Agent missed input validation risk",
           filePath: `snippets/${snippetId}.py`,
-          lineStart: 4,
+          lineStart: 3,
           lineEnd: 4,
           sourcePhase: 3,
         }),

@@ -15,6 +15,7 @@ interface Phase3FindingPanelProps {
   filePath: string;
   canSelectLines: boolean;
   findings: ReviewPhaseFinding[];
+  isRangeSelecting?: boolean;
   selectedRange?: FindingSelectionRange;
   onAddFinding: (finding: Omit<ReviewPhaseFinding, "id" | "createdAt" | "sourcePhase">) => void;
   onRemoveFinding: (findingId: string) => void;
@@ -33,6 +34,7 @@ export function Phase3FindingPanel({
   filePath,
   canSelectLines,
   findings,
+  isRangeSelecting,
   selectedRange,
   onAddFinding,
   onRemoveFinding,
@@ -79,7 +81,7 @@ export function Phase3FindingPanel({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <div className="space-y-4">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
           <div className="mb-4 space-y-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
@@ -91,9 +93,9 @@ export function Phase3FindingPanel({
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-on-surface">
               {selectedRange
-                ? `Anchored to ${filePath}:${formatLineRange(selectedRange.start, selectedRange.end)}`
+                ? `${isRangeSelecting ? "Previewing" : "Anchored to"} ${filePath}:${formatLineRange(selectedRange.start, selectedRange.end)}`
                 : canSelectLines
-                  ? "Click anywhere on a source line in the combined file review. Shift+click a second line to capture a range."
+                  ? "Click a line or its code, hover to preview the range, then click again to lock it."
                   : `Stored against ${filePath} without a line range.`}
             </div>
             {selectedRange ? (

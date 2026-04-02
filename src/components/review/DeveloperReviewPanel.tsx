@@ -28,6 +28,7 @@ function buildFilePath(snippet?: SnippetDetail) {
 export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemoveComment }: DeveloperReviewPanelProps) {
   const [selectionStart, setSelectionStart] = useState<number | undefined>();
   const [selectionEnd, setSelectionEnd] = useState<number | undefined>();
+  const [isRangeSelecting, setIsRangeSelecting] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [severityGuess, setSeverityGuess] = useState<FindingSeverity | "unknown">("unknown");
@@ -50,6 +51,7 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
   const clearSelection = () => {
     setSelectionStart(undefined);
     setSelectionEnd(undefined);
+    setIsRangeSelecting(false);
   };
 
   const resetForm = () => {
@@ -59,10 +61,20 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
     clearSelection();
   };
 
-  const handleSelectLine = (lineNumber: number, extendSelection: boolean) => {
-    if (!selectionStart || !extendSelection) {
+  const handleSelectLine = (lineNumber: number) => {
+    if (!selectionStart || !isRangeSelecting) {
       setSelectionStart(lineNumber);
       setSelectionEnd(lineNumber);
+      setIsRangeSelecting(true);
+      return;
+    }
+
+    setSelectionEnd(lineNumber);
+    setIsRangeSelecting(false);
+  };
+
+  const handlePreviewLine = (lineNumber: number) => {
+    if (!selectionStart || !isRangeSelecting) {
       return;
     }
 
@@ -94,8 +106,8 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
           </div>
           <h2 className="font-display text-2xl font-semibold text-on-surface">Comment on lines before AI feedback</h2>
           <p className="max-w-2xl text-sm leading-7 text-on-surface-variant">
-            Click a line number to anchor your review comment, or shift-click a second line to capture a multi-line
-            range. Your selected span is what gets scored and compared against the AI coaching output.
+            Click a line or its number to start your review comment, hover to preview a multi-line range, then click
+            again to lock it. Your selected span is what gets scored and compared against the AI coaching output.
           </p>
         </div>
         <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-on-surface-variant">
@@ -109,13 +121,13 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
             <div>
               <div className="text-sm font-medium text-on-surface">{snippet?.id ?? "Loading snippet..."}</div>
               <div className="mt-1 text-xs text-on-surface-variant">
-                Click to choose a line. Shift+click a second line to expand into a contiguous range.
+                Click to start a selection, hover across more lines to preview the range, then click again to lock it.
               </div>
             </div>
             <div className="flex items-center gap-2">
               {selectedRange ? (
                 <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs text-primary">
-                  Selected lines {formatLineRange(selectedRange.start, selectedRange.end)}
+                  {isRangeSelecting ? "Previewing" : "Selected"} lines {formatLineRange(selectedRange.start, selectedRange.end)}
                 </div>
               ) : null}
               {selectedRange ? (
@@ -148,11 +160,20 @@ export function DeveloperReviewPanel({ snippet, comments, onAddComment, onRemove
                     className={`select-none py-0.5 text-right text-xs ${
                       isSelected ? "text-primary" : "text-outline hover:text-on-surface"
                     } ${isBoundary ? "font-semibold" : ""}`}
-                    onClick={(event) => handleSelectLine(lineNumber, event.shiftKey)}
+                    onClick={() => handleSelectLine(lineNumber)}
+                    onMouseEnter={() => handlePreviewLine(lineNumber)}
                   >
                     {lineNumber}
                   </button>
-                  <span className="whitespace-pre-wrap break-words py-0.5 text-on-surface">{line || " "}</span>
+                  <button
+                    type="button"
+                    aria-label={`Anchor line ${lineNumber} from code`}
+                    className="w-full rounded px-1 py-0.5 text-left hover:bg-white/5"
+                    onClick={() => handleSelectLine(lineNumber)}
+                    onMouseEnter={() => handlePreviewLine(lineNumber)}
+                  >
+                    <span className="whitespace-pre-wrap break-words py-0.5 text-on-surface">{line || " "}</span>
+                  </button>
                 </div>
               );
             })}
