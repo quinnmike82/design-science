@@ -2,10 +2,13 @@ import { buildMockReviewResponse, normalizeReviewResponse } from "@/mappers/revi
 import type { ReviewIssueFeedbackState } from "@/models/review-feedback.types";
 import type {
   ReviewFlowStep,
+  ReviewerAiToolFrequencyOption,
+  ReviewerExperienceOption,
   ReviewInputState,
   ReviewIssueViewModel,
   ReviewNoteComparisonSummary,
   ReviewPhaseFinding,
+  ReviewerReviewFrequencyOption,
   ReviewReviewerProfile,
   ReviewResultViewModel,
   ReviewRunRecord,
@@ -13,7 +16,7 @@ import type {
   ReviewSubmitRequest,
   ReviewStepMetrics,
 } from "@/models/review.types";
-import type { ReviewSurvey, SurveyPreferredMode, SurveyScore } from "@/models/survey.types";
+import type { ReviewSurvey, SurveyReviewApproach, SurveyScore } from "@/models/survey.types";
 import { reviewApi } from "@/services/api/reviewApi";
 import { createId } from "@/utils/id";
 import {
@@ -44,9 +47,10 @@ function createEmptyInputState(): ReviewInputState {
 function createDefaultReviewerProfile(): ReviewReviewerProfile {
   const now = new Date().toISOString();
   return {
-    role: "DEV",
-    usualReviewTool: "github",
-    codeReviewImportance: "",
+    currentRole: "mid_level_developer",
+    programmingExperience: "3_5_years",
+    reviewFrequency: "occasionally",
+    aiToolUsageFrequency: "sometimes",
     createdAt: now,
     updatedAt: now,
   };
@@ -62,28 +66,78 @@ function normalizeReviewerProfile(profile?: Partial<ReviewReviewerProfile> | nul
   }
 
   const defaults = createDefaultReviewerProfile();
+  const normalizedCurrentRole = (() => {
+    switch (profile.currentRole ?? (profile as { role?: string }).role) {
+      case "student":
+      case "junior_developer":
+      case "mid_level_developer":
+      case "senior_developer":
+      case "tech_lead_manager":
+      case "other":
+        return profile.currentRole ?? (profile as { role?: ReviewReviewerProfile["currentRole"] }).role!;
+      case "DEV":
+        return "mid_level_developer";
+      case "PM":
+        return "tech_lead_manager";
+      case "BA":
+      case "QA":
+        return "other";
+      default:
+        return defaults.currentRole;
+    }
+  })();
+  const normalizedProgrammingExperience = (() => {
+    const explicitValue = profile.programmingExperience;
+    if (
+      explicitValue === "less_than_1_year" ||
+      explicitValue === "1_3_years" ||
+      explicitValue === "3_5_years" ||
+      explicitValue === "more_than_5_years"
+    ) {
+      return explicitValue;
+    }
+
+    const legacyYears = (profile as { yearsOfExperience?: number }).yearsOfExperience;
+    if (typeof legacyYears !== "number" || !Number.isFinite(legacyYears)) {
+      return defaults.programmingExperience;
+    }
+    if (legacyYears < 1) {
+      return "less_than_1_year";
+    }
+    if (legacyYears <= 3) {
+      return "1_3_years";
+    }
+    if (legacyYears <= 5) {
+      return "3_5_years";
+    }
+    return "more_than_5_years";
+  })();
+  const normalizedReviewFrequency: ReviewerReviewFrequencyOption =
+    profile.reviewFrequency === "rarely" ||
+    profile.reviewFrequency === "occasionally" ||
+    profile.reviewFrequency === "frequently"
+      ? profile.reviewFrequency
+      : defaults.reviewFrequency;
+  const normalizedAiToolUsageFrequency: ReviewerAiToolFrequencyOption =
+    profile.aiToolUsageFrequency === "rarely" ||
+    profile.aiToolUsageFrequency === "sometimes" ||
+    profile.aiToolUsageFrequency === "frequently"
+      ? profile.aiToolUsageFrequency
+      : defaults.aiToolUsageFrequency;
+
   return {
     ...defaults,
     ...profile,
-    role:
-      profile.role === "DEV" || profile.role === "BA" || profile.role === "QA" || profile.role === "PM"
-        ? profile.role
-        : defaults.role,
-    usualReviewTool:
-      profile.usualReviewTool === "github" ||
-      profile.usualReviewTool === "gitlab" ||
-      profile.usualReviewTool === "azure_devops" ||
-      profile.usualReviewTool === "ide" ||
-      profile.usualReviewTool === "ai_assistant" ||
-      profile.usualReviewTool === "other"
-        ? profile.usualReviewTool
-        : defaults.usualReviewTool,
-    yearsOfExperience:
-      typeof profile.yearsOfExperience === "number" && Number.isFinite(profile.yearsOfExperience)
-        ? Math.max(0, Math.floor(profile.yearsOfExperience))
+    currentRole: normalizedCurrentRole,
+    programmingExperience: normalizedProgrammingExperience as ReviewerExperienceOption,
+    codeReviewFamiliarityScore:
+      profile.codeReviewFamiliarityScore === 1 ||
+      profile.codeReviewFamiliarityScore === 2 ||
+      profile.codeReviewFamiliarityScore === 3
+        ? profile.codeReviewFamiliarityScore
         : undefined,
-    codeReviewImportance:
-      typeof profile.codeReviewImportance === "string" ? profile.codeReviewImportance : defaults.codeReviewImportance,
+    reviewFrequency: normalizedReviewFrequency,
+    aiToolUsageFrequency: normalizedAiToolUsageFrequency,
     createdAt:
       typeof profile.createdAt === "string" && profile.createdAt.trim().length > 0
         ? profile.createdAt
@@ -155,8 +209,8 @@ function normalizeSurveyScore(value: unknown, fallback: SurveyScore = 2): Survey
   return value === 1 || value === 2 || value === 3 ? value : fallback;
 }
 
-function normalizeSurveyPreferredMode(value: unknown): SurveyPreferredMode | undefined {
-  return value === "mono" || value === "multiple_agent" || value === "no_preference" ? value : undefined;
+function normalizeSurveyReviewApproach(value: unknown): SurveyReviewApproach | undefined {
+  return value === "mono" || value === "multiple_agent" ? value : undefined;
 }
 
 function normalizeReviewSurvey(
@@ -171,17 +225,31 @@ function normalizeReviewSurvey(
   const submittedAt = typeof submittedAtValue === "string" ? submittedAtValue : new Date().toISOString();
 
   return {
-    findingsQualityScore: normalizeSurveyScore(
-      (survey as Partial<ReviewSurvey>).findingsQualityScore,
+    reviewApproachUsed:
+      normalizeSurveyReviewApproach((survey as Partial<ReviewSurvey>).reviewApproachUsed) ??
+      normalizeSurveyReviewApproach((survey as { preferredMode?: unknown }).preferredMode) ??
+      "mono",
+    feedbackClarityScore: normalizeSurveyScore(
+      (survey as Partial<ReviewSurvey>).feedbackClarityScore ??
+        (survey as { codeReviewClarityScore?: unknown }).codeReviewClarityScore,
       legacyScore,
     ),
-    modeFitScore: normalizeSurveyScore((survey as Partial<ReviewSurvey>).modeFitScore, legacyScore),
-    codeReviewClarityScore: normalizeSurveyScore(
-      (survey as Partial<ReviewSurvey>).codeReviewClarityScore,
+    issueRelevanceScore: normalizeSurveyScore(
+      (survey as Partial<ReviewSurvey>).issueRelevanceScore ??
+        (survey as { findingsQualityScore?: unknown }).findingsQualityScore,
+      legacyScore,
+    ),
+    feedbackUsefulnessScore: normalizeSurveyScore(
+      (survey as Partial<ReviewSurvey>).feedbackUsefulnessScore ??
+        (survey as { modeFitScore?: unknown }).modeFitScore,
       legacyScore,
     ),
     trustScore: normalizeSurveyScore((survey as Partial<ReviewSurvey>).trustScore, legacyScore),
-    preferredMode: normalizeSurveyPreferredMode((survey as Partial<ReviewSurvey>).preferredMode),
+    overallSatisfactionScore: normalizeSurveyScore(
+      (survey as Partial<ReviewSurvey>).overallSatisfactionScore ??
+        (survey as { modeFitScore?: unknown }).modeFitScore,
+      legacyScore,
+    ),
     comment:
       typeof survey.comment === "string" && survey.comment.trim().length > 0 ? survey.comment.trim() : undefined,
     submittedAt,

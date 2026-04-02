@@ -1,5 +1,5 @@
 import type { ReviewIssueFeedbackState } from "@/models/review-feedback.types";
-import type { ReviewSurvey } from "@/models/survey.types";
+import type { ReviewSurvey, SurveyScore } from "@/models/survey.types";
 import type { DeveloperComment, SnippetDetail, SnippetSummary } from "@/types/review";
 
 export type ReviewFlowStep = 1 | 2 | 3;
@@ -9,8 +9,20 @@ export type ReviewTransportMode = "api" | "mock-fallback";
 export type ReviewFileKind = "main" | "supporting";
 export type SupportingDocumentType = "fsd" | "testcase" | "notes" | "other";
 export type ReviewIssueSeverity = "critical" | "high" | "medium" | "low";
-export type ReviewerRoleOption = "DEV" | "BA" | "QA" | "PM";
-export type ReviewerToolOption = "github" | "gitlab" | "azure_devops" | "ide" | "ai_assistant" | "other";
+export type ReviewerRoleOption =
+  | "student"
+  | "junior_developer"
+  | "mid_level_developer"
+  | "senior_developer"
+  | "tech_lead_manager"
+  | "other";
+export type ReviewerExperienceOption =
+  | "less_than_1_year"
+  | "1_3_years"
+  | "3_5_years"
+  | "more_than_5_years";
+export type ReviewerReviewFrequencyOption = "rarely" | "occasionally" | "frequently";
+export type ReviewerAiToolFrequencyOption = "rarely" | "sometimes" | "frequently";
 export type ReviewLineNote = DeveloperComment;
 export type ReviewSourceSnippetSummary = SnippetSummary;
 export type ReviewSourceSnippetDetail = SnippetDetail;
@@ -125,10 +137,11 @@ export interface ReviewResultViewModel {
 }
 
 export interface ReviewReviewerProfile {
-  role: ReviewerRoleOption;
-  yearsOfExperience?: number;
-  usualReviewTool: ReviewerToolOption;
-  codeReviewImportance: string;
+  currentRole: ReviewerRoleOption;
+  programmingExperience: ReviewerExperienceOption;
+  codeReviewFamiliarityScore?: SurveyScore;
+  reviewFrequency: ReviewerReviewFrequencyOption;
+  aiToolUsageFrequency: ReviewerAiToolFrequencyOption;
   createdAt: string;
   updatedAt: string;
 }

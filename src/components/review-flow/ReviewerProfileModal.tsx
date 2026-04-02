@@ -2,6 +2,7 @@ import { Button } from "@/components/common/Button";
 import { Panel } from "@/components/common/Panel";
 import { Select } from "@/components/common/Select";
 import type { ReviewReviewerProfile } from "@/models/review.types";
+import { cn } from "@/utils/cn";
 
 interface ReviewerProfileModalProps {
   open: boolean;
@@ -11,21 +12,72 @@ interface ReviewerProfileModalProps {
   onChange: (input: Partial<ReviewReviewerProfile>) => void;
 }
 
-const roleOptions: Array<{ value: ReviewReviewerProfile["role"]; label: string }> = [
-  { value: "DEV", label: "Developer" },
-  { value: "QA", label: "QA" },
-  { value: "BA", label: "Business Analyst" },
-  { value: "PM", label: "Project Manager" },
-];
-
-const toolOptions: Array<{ value: ReviewReviewerProfile["usualReviewTool"]; label: string }> = [
-  { value: "github", label: "GitHub" },
-  { value: "gitlab", label: "GitLab" },
-  { value: "azure_devops", label: "Azure DevOps" },
-  { value: "ide", label: "IDE tools" },
-  { value: "ai_assistant", label: "AI assistant" },
+const roleOptions: Array<{ value: ReviewReviewerProfile["currentRole"]; label: string }> = [
+  { value: "student", label: "Student" },
+  { value: "junior_developer", label: "Junior Developer (0–2 years)" },
+  { value: "mid_level_developer", label: "Mid-level Developer (2–5 years)" },
+  { value: "senior_developer", label: "Senior Developer (5+ years)" },
+  { value: "tech_lead_manager", label: "Tech Lead / Manager" },
   { value: "other", label: "Other" },
 ];
+
+const programmingExperienceOptions: Array<{ value: ReviewReviewerProfile["programmingExperience"]; label: string }> = [
+  { value: "less_than_1_year", label: "Less than 1 year" },
+  { value: "1_3_years", label: "1–3 years" },
+  { value: "3_5_years", label: "3–5 years" },
+  { value: "more_than_5_years", label: "More than 5 years" },
+];
+
+const reviewFrequencyOptions: Array<{ value: ReviewReviewerProfile["reviewFrequency"]; label: string }> = [
+  { value: "rarely", label: "Rarely" },
+  { value: "occasionally", label: "Occasionally" },
+  { value: "frequently", label: "Frequently" },
+];
+
+const aiToolUsageOptions: Array<{ value: ReviewReviewerProfile["aiToolUsageFrequency"]; label: string }> = [
+  { value: "rarely", label: "Rarely" },
+  { value: "sometimes", label: "Sometimes" },
+  { value: "frequently", label: "Frequently" },
+];
+
+function RatingQuestion({
+  title,
+  helper,
+  value,
+  onChange,
+}: {
+  title: string;
+  helper: string;
+  value?: 1 | 2 | 3;
+  onChange: (value: 1 | 2 | 3) => void;
+}) {
+  return (
+    <div role="group" aria-label={title} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="space-y-1">
+        <div className="font-medium text-on-surface">{title}</div>
+        <div className="text-xs leading-5 text-on-surface-variant">{helper}</div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        {[1, 2, 3].map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={value === option}
+            onClick={() => onChange(option as 1 | 2 | 3)}
+            className={cn(
+              "rounded-2xl border px-4 py-4 text-left transition-all",
+              value === option
+                ? "border-primary/40 bg-primary/10 shadow-glow"
+                : "border-white/10 bg-surface-low/80 hover:border-white/20",
+            )}
+          >
+            <div className="text-lg font-semibold text-on-surface">{option}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ReviewerProfileModal({
   open,
@@ -44,14 +96,14 @@ export function ReviewerProfileModal({
       aria-modal="true"
       className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 px-5 py-8 backdrop-blur-sm"
     >
-      <Panel className="w-full max-w-3xl space-y-6">
+      <Panel className="max-h-[90vh] w-full max-w-4xl space-y-6 overflow-y-auto">
         <div className="space-y-2">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">
-            Phase 1 · Step 6
+            Section 1 · Participant Background
           </div>
-          <h3 className="font-display text-3xl font-semibold text-on-surface">Reviewer Profile While The Review Runs</h3>
+          <h3 className="font-display text-3xl font-semibold text-on-surface">Participant Background While The Review Runs</h3>
           <p className="text-sm leading-6 text-on-surface-variant">
-            Save a little reviewer context for later reporting. These answers are stored locally as you type.
+            This section captures reviewer background while the agent is working. The answers are saved locally as you fill them in.
           </p>
         </div>
 
@@ -63,16 +115,17 @@ export function ReviewerProfileModal({
           }`}
         >
           {loading
-            ? "The API review is running now. You can fill this in while the result is being prepared."
-            : "The review request has finished. You can reopen this form anytime from the phase header if you want to update the stored context."}
+            ? "The API review is running now. You can complete the participant background questions while waiting for the response."
+            : "The review request has finished. You can reopen this section anytime from the phase header if you want to update the stored background data."}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Select
-            label="Role"
-            value={profile.role}
-            onChange={(event) => onChange({ role: event.target.value as ReviewReviewerProfile["role"] })}
-            helperText="Default role is Developer."
+            label="Q1. What is your current role?"
+            value={profile.currentRole}
+            onChange={(event) =>
+              onChange({ currentRole: event.target.value as ReviewReviewerProfile["currentRole"] })
+            }
           >
             {roleOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -81,53 +134,61 @@ export function ReviewerProfileModal({
             ))}
           </Select>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-              Years Experience
-            </span>
-            <input
-              type="number"
-              min={0}
-              value={profile.yearsOfExperience ?? ""}
-              onChange={(event) =>
-                onChange({
-                  yearsOfExperience:
-                    event.target.value.trim().length > 0 ? Math.max(0, Number(event.target.value)) : undefined,
-                })
-              }
-              className="h-11 w-full rounded-xl border border-white/10 bg-surface/90 px-4 text-sm text-on-surface transition-colors focus:border-primary/60"
-              placeholder="e.g. 5"
-            />
-          </label>
+          <Select
+            label="Q2. How many years of programming experience do you have?"
+            value={profile.programmingExperience}
+            onChange={(event) =>
+              onChange({
+                programmingExperience: event.target.value as ReviewReviewerProfile["programmingExperience"],
+              })
+            }
+          >
+            {programmingExperienceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
         </div>
 
-        <Select
-          label="Usual Review Tool"
-          value={profile.usualReviewTool}
-          onChange={(event) =>
-            onChange({ usualReviewTool: event.target.value as ReviewReviewerProfile["usualReviewTool"] })
-          }
-          helperText="Pick the tool you usually rely on for code review."
-        >
-          {toolOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+        <RatingQuestion
+          title="Q3. How familiar are you with code review processes?"
+          helper="1 = Not familiar, 2 = Moderate familiarity, 3 = Very familiar"
+          value={profile.codeReviewFamiliarityScore}
+          onChange={(value) => onChange({ codeReviewFamiliarityScore: value })}
+        />
 
-        <label className="flex flex-col gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-            Why Is Code Review Important?
-          </span>
-          <textarea
-            rows={5}
-            value={profile.codeReviewImportance}
-            onChange={(event) => onChange({ codeReviewImportance: event.target.value })}
-            className="w-full rounded-3xl border border-white/10 bg-surface-low/80 px-4 py-3 text-sm text-on-surface"
-            placeholder="Capture what matters most in code review for your team."
-          />
-        </label>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Select
+            label="Q4. How often do you perform or receive code reviews?"
+            value={profile.reviewFrequency}
+            onChange={(event) =>
+              onChange({ reviewFrequency: event.target.value as ReviewReviewerProfile["reviewFrequency"] })
+            }
+          >
+            {reviewFrequencyOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            label="Q5. How often do you use AI tools (e.g., ChatGPT, GitHub Copilot) for coding?"
+            value={profile.aiToolUsageFrequency}
+            onChange={(event) =>
+              onChange({
+                aiToolUsageFrequency: event.target.value as ReviewReviewerProfile["aiToolUsageFrequency"],
+              })
+            }
+          >
+            {aiToolUsageOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         <div className="flex flex-wrap justify-end gap-3">
           <Button variant="ghost" onClick={onClose}>

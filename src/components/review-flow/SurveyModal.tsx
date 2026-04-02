@@ -5,7 +5,7 @@ import { Select } from "@/components/common/Select";
 import type {
   ReviewSurvey,
   SurveyFormValues,
-  SurveyPreferredMode,
+  SurveyReviewApproach,
   SurveyScore,
 } from "@/models/survey.types";
 import { cn } from "@/utils/cn";
@@ -22,7 +22,7 @@ interface SurveyModalProps {
 interface SurveyQuestionDefinition {
   key: keyof Pick<
     SurveyFormValues,
-    "findingsQualityScore" | "modeFitScore" | "codeReviewClarityScore" | "trustScore"
+    "feedbackClarityScore" | "issueRelevanceScore" | "feedbackUsefulnessScore" | "trustScore" | "overallSatisfactionScore"
   >;
   title: string;
   helper: string;
@@ -30,23 +30,15 @@ interface SurveyQuestionDefinition {
 
 type SurveyDraft = Partial<SurveyFormValues>;
 
-const ratingLabels: Record<SurveyScore, string> = {
-  1: "Low",
-  2: "Okay",
-  3: "High",
-};
-
 function getModeLabel(reviewMode?: "mono" | "multiple_agent") {
-  return reviewMode === "multiple_agent" ? "Multiple Agent" : "Mono";
-}
-
-function getAlternateMode(reviewMode?: "mono" | "multiple_agent"): SurveyPreferredMode {
-  return reviewMode === "multiple_agent" ? "mono" : "multiple_agent";
+  return reviewMode === "multiple_agent"
+    ? "Role-specialized AI reviewers (multi-agent)"
+    : "Monolithic LLM reviewer";
 }
 
 function buildDefaultSurvey(reviewMode?: "mono" | "multiple_agent"): SurveyDraft {
   return {
-    preferredMode: reviewMode,
+    reviewApproachUsed: reviewMode ?? "mono",
     comment: "",
   };
 }
@@ -83,7 +75,6 @@ function RatingQuestion({
             )}
           >
             <div className="text-lg font-semibold text-on-surface">{option}</div>
-            <div className="mt-1 text-xs text-on-surface-variant">{ratingLabels[option as SurveyScore]}</div>
           </button>
         ))}
       </div>
@@ -102,44 +93,35 @@ export function SurveyModal({
   const [draft, setDraft] = useState<SurveyDraft>(() => initialSurvey ?? buildDefaultSurvey(reviewMode));
   const [error, setError] = useState<string | null>(null);
 
-  const modeLabel = getModeLabel(reviewMode);
-  const alternateMode = getAlternateMode(reviewMode);
-  const preferredModeOptions = useMemo<Array<{ value: SurveyPreferredMode; label: string }>>(
-    () => [
-      { value: reviewMode ?? "mono", label: `Prefer ${modeLabel}` },
-      {
-        value: alternateMode,
-        label: `Prefer ${alternateMode === "multiple_agent" ? "Multiple Agent" : "Mono"}`,
-      },
-      { value: "no_preference", label: "No preference" },
-    ],
-    [alternateMode, modeLabel, reviewMode],
-  );
-
   const questions = useMemo<SurveyQuestionDefinition[]>(
     () => [
       {
-        key: "findingsQualityScore",
-        title: "How useful were the review findings?",
-        helper: "1 = weak, 2 = acceptable, 3 = strong",
+        key: "feedbackClarityScore",
+        title: "Q7. How clear and easy to understand was the code review feedback?",
+        helper: "1 = Poor, 2 = Average, 3 = Good",
       },
       {
-        key: "modeFitScore",
-        title: `How useful was the ${modeLabel} review mode for this run?`,
-        helper: "1 = poor fit, 2 = acceptable fit, 3 = strong fit",
+        key: "issueRelevanceScore",
+        title: "Q8. How well did the system identify relevant issues in the code?",
+        helper: "1 = Poor, 2 = Average, 3 = Good",
       },
       {
-        key: "codeReviewClarityScore",
-        title: "How clear was the file-level code review in Phase 3?",
-        helper: "1 = unclear, 2 = manageable, 3 = very clear",
+        key: "feedbackUsefulnessScore",
+        title: "Q9. How useful was the feedback for improving or fixing the code?",
+        helper: "1 = Poor, 2 = Average, 3 = Good",
       },
       {
         key: "trustScore",
-        title: "How much did you trust the suggested changes?",
-        helper: "1 = low trust, 2 = partial trust, 3 = high trust",
+        title: "Q10. How much do you trust the review results?",
+        helper: "1 = Low, 2 = Average, 3 = High",
+      },
+      {
+        key: "overallSatisfactionScore",
+        title: "Q11. Overall, how satisfied are you with this code review approach?",
+        helper: "1 = Not satisfied, 2 = Average, 3 = Very satisfied",
       },
     ],
-    [modeLabel],
+    [],
   );
 
   useEffect(() => {
@@ -163,12 +145,29 @@ export function SurveyModal({
     >
       <Panel className="max-h-[90vh] w-full max-w-4xl space-y-6 overflow-y-auto">
         <div className="space-y-2">
-          <h3 className="font-display text-3xl font-semibold text-on-surface">Review Survey</h3>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-secondary">
+            Section 2 · Code Review Experience
+          </div>
+          <h3 className="font-display text-3xl font-semibold text-on-surface">Post-review Survey</h3>
           <p className="text-sm leading-6 text-on-surface-variant">
-            Share a little more feedback about the findings, the {modeLabel} workflow, and the file-level review
-            experience.
+            Share feedback about the code review experience after you finish reading the result.
           </p>
         </div>
+
+        <Select
+          label="Q6. Which code review approach did you use?"
+          value={draft.reviewApproachUsed ?? reviewMode ?? "mono"}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              reviewApproachUsed: event.target.value as SurveyReviewApproach,
+            }))
+          }
+          helperText={`Defaulted from this run: ${getModeLabel(reviewMode)}`}
+        >
+          <option value="multiple_agent">Role-specialized AI reviewers (multi-agent)</option>
+          <option value="mono">Monolithic LLM reviewer</option>
+        </Select>
 
         <div className="grid gap-4 lg:grid-cols-2">
           {questions.map((question) => (
@@ -188,43 +187,23 @@ export function SurveyModal({
           ))}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[0.75fr_1.25fr]">
-          <Select
-            label="Preferred Mode Next Time"
-            helperText="This helps us understand whether reviewers still prefer Mono or Multiple Agent after using the flow."
-            value={draft.preferredMode ?? reviewMode ?? "mono"}
+        <label className="flex flex-col gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
+            Q12. What did you like or dislike about this code review approach?
+          </span>
+          <textarea
+            rows={5}
+            value={draft.comment ?? ""}
             onChange={(event) =>
               setDraft((current) => ({
                 ...current,
-                preferredMode: event.target.value as SurveyPreferredMode,
+                comment: event.target.value,
               }))
             }
-          >
-            {preferredModeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-on-surface-variant">
-              Additional Comments
-            </span>
-            <textarea
-              rows={5}
-              value={draft.comment ?? ""}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  comment: event.target.value,
-                }))
-              }
-              className="w-full rounded-3xl border border-white/10 bg-surface-low/80 px-4 py-3 text-sm text-on-surface"
-              placeholder="What worked well, what felt confusing, and what would you change?"
-            />
-          </label>
-        </div>
+            className="w-full rounded-3xl border border-white/10 bg-surface-low/80 px-4 py-3 text-sm text-on-surface"
+            placeholder="Optional feedback about what worked well or what felt weak."
+          />
+        </label>
 
         {error ? <div className="text-sm text-error">{error}</div> : null}
 
@@ -235,18 +214,21 @@ export function SurveyModal({
           <Button
             disabled={loading}
             onClick={() => {
-              const allAnswered = questions.every((question) => Boolean(draft[question.key]));
+              const allAnswered =
+                Boolean(draft.reviewApproachUsed) &&
+                questions.every((question) => Boolean(draft[question.key]));
               if (!allAnswered) {
                 setError("Please answer all survey questions before submitting.");
                 return;
               }
 
               void onSubmit({
-                findingsQualityScore: draft.findingsQualityScore!,
-                modeFitScore: draft.modeFitScore!,
-                codeReviewClarityScore: draft.codeReviewClarityScore!,
+                reviewApproachUsed: draft.reviewApproachUsed!,
+                feedbackClarityScore: draft.feedbackClarityScore!,
+                issueRelevanceScore: draft.issueRelevanceScore!,
+                feedbackUsefulnessScore: draft.feedbackUsefulnessScore!,
                 trustScore: draft.trustScore!,
-                preferredMode: draft.preferredMode,
+                overallSatisfactionScore: draft.overallSatisfactionScore!,
                 comment: draft.comment?.trim() || undefined,
               });
             }}

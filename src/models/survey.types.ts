@@ -1,22 +1,24 @@
 export type SurveyScore = 1 | 2 | 3;
-export type SurveyPreferredMode = "mono" | "multiple_agent" | "no_preference";
+export type SurveyReviewApproach = "mono" | "multiple_agent";
 
 export interface ReviewSurvey {
-  findingsQualityScore: SurveyScore;
-  modeFitScore: SurveyScore;
-  codeReviewClarityScore: SurveyScore;
+  reviewApproachUsed: SurveyReviewApproach;
+  feedbackClarityScore: SurveyScore;
+  issueRelevanceScore: SurveyScore;
+  feedbackUsefulnessScore: SurveyScore;
   trustScore: SurveyScore;
-  preferredMode?: SurveyPreferredMode;
+  overallSatisfactionScore: SurveyScore;
   comment?: string;
   submittedAt: string;
 }
 
 export interface SurveyFormValues {
-  findingsQualityScore: SurveyScore;
-  modeFitScore: SurveyScore;
-  codeReviewClarityScore: SurveyScore;
+  reviewApproachUsed: SurveyReviewApproach;
+  feedbackClarityScore: SurveyScore;
+  issueRelevanceScore: SurveyScore;
+  feedbackUsefulnessScore: SurveyScore;
   trustScore: SurveyScore;
-  preferredMode?: SurveyPreferredMode;
+  overallSatisfactionScore: SurveyScore;
   comment?: string;
 }
 

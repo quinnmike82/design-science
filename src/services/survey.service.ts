@@ -30,11 +30,12 @@ async function postSurveyWithFallback(payload: SurveySubmitRequest) {
 export async function submitSurvey(request: SurveySubmitRequest): Promise<SurveyMutationResult> {
   const requestStatus = await postSurveyWithFallback(request);
   const survey: ReviewSurvey = {
-    findingsQualityScore: request.findingsQualityScore,
-    modeFitScore: request.modeFitScore,
-    codeReviewClarityScore: request.codeReviewClarityScore,
+    reviewApproachUsed: request.reviewApproachUsed,
+    feedbackClarityScore: request.feedbackClarityScore,
+    issueRelevanceScore: request.issueRelevanceScore,
+    feedbackUsefulnessScore: request.feedbackUsefulnessScore,
     trustScore: request.trustScore,
-    preferredMode: request.preferredMode,
+    overallSatisfactionScore: request.overallSatisfactionScore,
     comment: request.comment?.trim() || undefined,
     submittedAt: new Date().toISOString(),
   };

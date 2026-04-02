@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReviewFlowPage } from "@/pages/ReviewFlowPage";
@@ -67,11 +67,10 @@ async function prepareReview(user: ReturnType<typeof userEvent.setup>) {
 async function addInterviewerNote(user: ReturnType<typeof userEvent.setup>) {
   await screen.findByRole("button", { name: "Select line 4" });
   await user.click(screen.getByRole("button", { name: "Select line 4" }));
-  await user.type(screen.getByPlaceholderText("Issue title"), "Potential eval risk");
-  await user.type(
-    screen.getByPlaceholderText(/Why do you think this is a problem/i),
-    "Dynamic evaluation should be reviewed before AI feedback.",
-  );
+  fireEvent.change(screen.getByPlaceholderText("Issue title"), { target: { value: "Potential eval risk" } });
+  fireEvent.change(screen.getByPlaceholderText(/Why do you think this is a problem/i), {
+    target: { value: "Dynamic evaluation should be reviewed before AI feedback." },
+  });
   await user.click(screen.getByRole("button", { name: "Add Review Comment" }));
   await screen.findByText("Potential eval risk");
 }
@@ -253,11 +252,12 @@ describe("ReviewFlowPage", () => {
     expect(screen.getByText(/Selected lines 2-4/i)).toBeInTheDocument();
     expect(screen.getByText(/Anchored to snippets\/snippet_algebra\.py:2-4/i)).toBeInTheDocument();
 
-    await user.type(screen.getByPlaceholderText("Issue title"), "Range-based reviewer note");
-    await user.type(
-      screen.getByPlaceholderText(/Why do you think this is a problem/i),
-      "The surrounding logic across these lines needs to be reviewed together.",
-    );
+    fireEvent.change(screen.getByPlaceholderText("Issue title"), {
+      target: { value: "Range-based reviewer note" },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Why do you think this is a problem/i), {
+      target: { value: "The surrounding logic across these lines needs to be reviewed together." },
+    });
     await user.click(screen.getByRole("button", { name: "Add Review Comment" }));
 
     expect(await screen.findByText("Range-based reviewer note")).toBeInTheDocument();
@@ -561,14 +561,23 @@ describe("ReviewFlowPage", () => {
 
     await screen.findByRole("dialog");
     const liveDialog = screen.getByRole("dialog");
-    const [roleSelect, toolSelect] = within(liveDialog).getAllByRole("combobox");
-    await user.selectOptions(roleSelect, "QA");
-    await user.type(within(liveDialog).getByPlaceholderText("e.g. 5"), "7");
-    await user.selectOptions(toolSelect, "ai_assistant");
-    await user.type(
-      within(liveDialog).getByPlaceholderText("Capture what matters most in code review for your team."),
-      "It protects delivery quality and catches risks early.",
+    const [roleSelect, experienceSelect, reviewFrequencySelect, aiToolSelect] = within(liveDialog).getAllByRole("combobox");
+    await user.selectOptions(roleSelect, "senior_developer");
+    await user.selectOptions(experienceSelect, "more_than_5_years");
+    await user.click(
+      within(liveDialog).getByRole("group", {
+        name: "Q3. How familiar are you with code review processes?",
+      }),
     );
+    await user.click(
+      within(
+        within(liveDialog).getByRole("group", {
+          name: "Q3. How familiar are you with code review processes?",
+        }),
+      ).getByRole("button", { name: "3" }),
+    );
+    await user.selectOptions(reviewFrequencySelect, "frequently");
+    await user.selectOptions(aiToolSelect, "sometimes");
 
     await user.click(await screen.findByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
@@ -576,10 +585,11 @@ describe("ReviewFlowPage", () => {
 
     const [storedRun] = readStoredRuns();
     expect(storedRun.reviewerProfile).toMatchObject({
-      role: "QA",
-      yearsOfExperience: 7,
-      usualReviewTool: "ai_assistant",
-      codeReviewImportance: "It protects delivery quality and catches risks early.",
+      currentRole: "senior_developer",
+      programmingExperience: "more_than_5_years",
+      codeReviewFamiliarityScore: 3,
+      reviewFrequency: "frequently",
+      aiToolUsageFrequency: "sometimes",
     });
     expect(storedRun.submissionMetadata).toMatchObject({
       apiReviewId: "api-review-123",
@@ -907,21 +917,27 @@ describe("ReviewFlowPage", () => {
     await user.click(within(dialog).getByRole("button", { name: "Submit Survey" }));
     expect(within(dialog).getByText("Please answer all survey questions before submitting.")).toBeInTheDocument();
 
-    const findingsCard = within(dialog).getByRole("group", { name: "How useful were the review findings?" });
-    const modeCard = within(dialog).getByRole("group", {
-      name: /How useful was the Multiple Agent review mode for this run/i,
-    });
     const clarityCard = within(dialog).getByRole("group", {
-      name: "How clear was the file-level code review in Phase 3?",
+      name: "Q7. How clear and easy to understand was the code review feedback?",
+    });
+    const relevanceCard = within(dialog).getByRole("group", {
+      name: "Q8. How well did the system identify relevant issues in the code?",
+    });
+    const usefulnessCard = within(dialog).getByRole("group", {
+      name: "Q9. How useful was the feedback for improving or fixing the code?",
     });
     const trustCard = within(dialog).getByRole("group", {
-      name: "How much did you trust the suggested changes?",
+      name: "Q10. How much do you trust the review results?",
+    });
+    const satisfactionCard = within(dialog).getByRole("group", {
+      name: "Q11. Overall, how satisfied are you with this code review approach?",
     });
 
-    await user.click(within(findingsCard).getByRole("button", { name: /3/i }));
-    await user.click(within(modeCard).getByRole("button", { name: /2/i }));
     await user.click(within(clarityCard).getByRole("button", { name: /3/i }));
+    await user.click(within(relevanceCard).getByRole("button", { name: /2/i }));
+    await user.click(within(usefulnessCard).getByRole("button", { name: /3/i }));
     await user.click(within(trustCard).getByRole("button", { name: /2/i }));
+    await user.click(within(satisfactionCard).getByRole("button", { name: /3/i }));
     await user.click(within(dialog).getByRole("button", { name: "Submit Survey" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
