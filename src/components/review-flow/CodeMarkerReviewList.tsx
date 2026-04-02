@@ -78,12 +78,9 @@ export function CodeMarkerReviewList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-start gap-3">
         <Button variant="outline" size="sm" onClick={onBackToSummary}>
           Back to Summary Phase
-        </Button>
-        <Button size="sm" onClick={onOpenSurvey}>
-          Open Survey
         </Button>
       </div>
 
@@ -102,6 +99,12 @@ export function CodeMarkerReviewList({
           onRemovePhase3Finding={onRemovePhase3Finding}
         />
       ))}
+
+      <div className="flex justify-end pt-2">
+        <Button size="sm" onClick={onOpenSurvey}>
+          Open Survey
+        </Button>
+      </div>
     </div>
   );
 }

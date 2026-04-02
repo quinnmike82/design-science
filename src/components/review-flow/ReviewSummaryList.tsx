@@ -14,7 +14,10 @@ interface ReviewSummaryListProps {
 
 export function ReviewSummaryList({ issues, reportingIds, onReportFault, onContinue }: ReviewSummaryListProps) {
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
-  const allExpanded = useMemo(() => issues.length > 0 && expandedIds.length === issues.length, [expandedIds.length, issues.length]);
+  const allExpanded = useMemo(
+    () => issues.length > 0 && expandedIds.length === issues.length,
+    [expandedIds.length, issues.length],
+  );
 
   if (issues.length === 0) {
     return (
@@ -42,10 +45,6 @@ export function ReviewSummaryList({ issues, reportingIds, onReportFault, onConti
           >
             {allExpanded ? "Collapse all" : "Expand all"}
           </Button>
-          <Button size="sm" onClick={onContinue}>
-            Continue to Marker Review Phase
-            <ArrowRight className="size-4" />
-          </Button>
         </div>
       </div>
 
@@ -66,6 +65,13 @@ export function ReviewSummaryList({ issues, reportingIds, onReportFault, onConti
           />
         );
       })}
+
+      <div className="flex justify-end pt-2">
+        <Button size="sm" onClick={onContinue}>
+          Continue to Marker Review Phase
+          <ArrowRight className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }
