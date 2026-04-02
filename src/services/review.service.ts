@@ -4,6 +4,7 @@ import type {
   ReviewFlowStep,
   ReviewerAiToolFrequencyOption,
   ReviewerExperienceOption,
+  ReviewInputFile,
   ReviewInputState,
   ReviewIssueViewModel,
   ReviewNoteComparisonSummary,
@@ -18,6 +19,14 @@ import type {
 } from "@/models/review.types";
 import type { ReviewSurvey, SurveyReviewApproach, SurveyScore } from "@/models/survey.types";
 import { reviewApi } from "@/services/api/reviewApi";
+import { loadResults as loadLegacyResults, loadSessions as loadLegacySessions } from "@/services/local/persistence";
+import type {
+  Artifact as LegacyArtifact,
+  DeveloperComment as LegacyDeveloperComment,
+  Finding as LegacyFinding,
+  ReviewResult as LegacyReviewResult,
+  ReviewSession as LegacyReviewSession,
+} from "@/types/review";
 import { createId } from "@/utils/id";
 import {
   activateReviewStepMetrics,
@@ -27,6 +36,16 @@ import {
 } from "@/utils/reviewTiming";
 
 const REVIEW_RUNS_STORAGE_KEY = "synthetic-architect.review-flow.runs";
+
+const legacyRoleNameMap: Record<LegacyFinding["agentId"], string> = {
+  security: "Security Agent",
+  architecture: "Architecture Agent",
+  logic: "Logic Agent",
+  maintainability: "Maintainability Agent",
+  testing: "Testing Agent",
+  policy: "Policy Agent",
+  general: "General Agent",
+};
 
 function hasStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -54,6 +73,224 @@ function createDefaultReviewerProfile(): ReviewReviewerProfile {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function buildSnippetFileName(snippetId: string, language?: string) {
+  const extensionMap: Record<string, string> = {
+    python: "py",
+    typescript: "ts",
+    javascript: "js",
+    go: "go",
+    java: "java",
+    kotlin: "kt",
+  };
+
+  const extension = extensionMap[(language ?? "").toLowerCase()] ?? "txt";
+  return `snippets/${snippetId}.${extension}`;
+}
+
+function normalizeLegacyMode(value?: LegacyReviewSession["reviewMode"] | LegacyReviewResult["mode"]) {
+  return value === "specialist" ? "multiple_agent" : "mono";
+}
+
+function normalizeLegacyNoteMatchStatus(status?: LegacyFinding["developerFoundStatus"]) {
+  if (status === "found") {
+    return "matched";
+  }
+  if (status === "missed") {
+    return "agent_only";
+  }
+  return "unknown";
+}
+
+function mapLegacyArtifactToSupportingFile(artifact: LegacyArtifact): ReviewInputFile {
+  const documentType =
+    artifact.type === "fsd" || artifact.type === "testcase" || artifact.type === "notes"
+      ? artifact.type
+      : "other";
+
+  return {
+    id: artifact.id,
+    kind: "supporting",
+    name: artifact.fileName ?? artifact.name,
+    content: artifact.content,
+    size: artifact.size ?? artifact.content.length,
+    uploadedAt: artifact.uploadedAt,
+    documentType,
+  };
+}
+
+function buildLegacyNoteComparison(session?: LegacyReviewSession, result?: LegacyReviewResult): ReviewNoteComparisonSummary {
+  const comments = session?.developerComments ?? result?.developerComments ?? [];
+  const findings = result?.findings ?? [];
+  const matchedIssueIdsByComment = new Map<string, string[]>();
+
+  findings.forEach((finding) => {
+    finding.relatedCommentIds.forEach((commentId) => {
+      matchedIssueIdsByComment.set(commentId, [...(matchedIssueIdsByComment.get(commentId) ?? []), finding.id]);
+    });
+  });
+
+  const notes = comments.map((comment) => {
+    const matchedIssueIds = matchedIssueIdsByComment.get(comment.id) ?? [];
+    return {
+      id: comment.id,
+      title: comment.title,
+      description: comment.description,
+      filePath: comment.filePath,
+      lineStart: comment.lineStart,
+      lineEnd: comment.lineEnd,
+      status: matchedIssueIds.length > 0 ? "matched" : "unmatched",
+      matchedIssueIds,
+    } as ReviewNoteComparisonSummary["notes"][number];
+  });
+
+  return {
+    totalNotes: comments.length,
+    matchedNotes: notes.filter((note) => note.status === "matched").length,
+    unmatchedNotes: notes.filter((note) => note.status === "unmatched").length,
+    agentMatchedIssues: findings.filter((finding) => finding.developerFoundStatus === "found").length,
+    agentOnlyIssues: findings.filter((finding) => finding.developerFoundStatus === "missed").length,
+    notes,
+  };
+}
+
+function mapLegacyFindingToIssue(
+  finding: LegacyFinding,
+  commentsById: Map<string, LegacyDeveloperComment>,
+  result?: LegacyReviewResult,
+  session?: LegacyReviewSession,
+): ReviewIssueViewModel {
+  const locationLabel =
+    finding.filePath && finding.lineStart ? `${finding.filePath}:${finding.lineStart}` : finding.filePath ?? "Unknown location";
+  const report = result?.issueReports?.find((item) => item.findingId === finding.id);
+
+  return {
+    id: finding.id,
+    title: finding.title,
+    severity: finding.severity,
+    roleName: legacyRoleNameMap[finding.agentId] ?? finding.agentId,
+    filePath: finding.filePath,
+    lineNumber: finding.lineStart,
+    locationLabel,
+    description: finding.technicalDetails || finding.summary,
+    suggestion: finding.suggestedFix ?? finding.recommendation,
+    originalSnippet: undefined,
+    replacementSnippet: undefined,
+    sourceFileContent: session?.snippetCode,
+    rationale: finding.businessImpact,
+    canRenderRichDiff: false,
+    noteMatchStatus: normalizeLegacyNoteMatchStatus(finding.developerFoundStatus),
+    relatedNoteIds: finding.relatedCommentIds,
+    relatedNoteTitles: finding.relatedCommentIds
+      .map((commentId) => commentsById.get(commentId)?.title)
+      .filter((title): title is string => Boolean(title)),
+    feedback: {
+      reportedFault: report
+        ? {
+            reason: report.reason,
+            createdAt: report.submittedAt,
+            sourceStep: "summary",
+          }
+        : undefined,
+      comments: [],
+      wrongResult: undefined,
+      suggestedLineReports: [],
+    },
+    rawMetadata: {
+      legacyAgentId: finding.agentId,
+      category: finding.category,
+      confidence: finding.confidence,
+      tags: finding.tags,
+      relatedArtifacts: finding.relatedArtifacts,
+    },
+  };
+}
+
+function mapLegacyRun(session: LegacyReviewSession, result?: LegacyReviewResult): ReviewRunRecord {
+  const mainFileName = buildSnippetFileName(session.snippetId, session.snippetLanguage);
+  const commentsById = new Map(session.developerComments.map((comment) => [comment.id, comment]));
+  const issues = (result?.findings ?? []).map((finding) => mapLegacyFindingToIssue(finding, commentsById, result, session));
+  const totalActiveSec = session.timeSpentSec ?? result?.metrics.timeSpentSec ?? 0;
+  const mode = normalizeLegacyMode(result?.mode ?? session.reviewMode);
+  const noteComparison = buildLegacyNoteComparison(session, result);
+
+  return normalizeReviewRun({
+    id: session.id,
+    status: session.status,
+    createdAt: session.createdAt,
+    updatedAt: session.submittedAt ?? session.createdAt,
+    currentStep: result ? 2 : 1,
+    stepMetrics: {
+      totalActiveSec,
+      stepTimesSec: {
+        1: totalActiveSec,
+        2: 0,
+        3: 0,
+      },
+    },
+    submissionMetadata: {
+      apiReviewId: session.backendSessionId ?? result?.sessionId,
+      transportMode: result ? "api" : undefined,
+      capturedAt: session.submittedAt,
+    },
+    phase3Findings: [],
+    input: {
+      reviewMode: mode,
+      selectedSnippetId: session.snippetId,
+      selectedSnippet: {
+        id: session.snippetId,
+        label: session.snippetTitle,
+        language: session.snippetLanguage,
+        context: session.snippetContext,
+        numSeededIssues: 0,
+        code: session.snippetCode,
+      },
+      mainFiles: [
+        {
+          id: `legacy-main-${session.id}`,
+          kind: "main",
+          name: mainFileName,
+          content: session.snippetCode,
+          size: session.snippetCode.length,
+          uploadedAt: session.createdAt,
+        },
+      ],
+      supportingFiles: session.artifacts.map(mapLegacyArtifactToSupportingFile),
+      developerNotes: session.developerComments,
+      notes: session.description,
+    },
+    result: result
+      ? {
+          reviewRunId: session.id,
+          backendReviewId: session.backendSessionId ?? result.sessionId,
+          mode,
+          transportMode: "api",
+          summaryText: result.mergedSummary || result.executiveSummary,
+          issues,
+          noteComparison,
+          severityCounts: result.severityCounts,
+          submittedAt: session.submittedAt ?? session.createdAt,
+          supportsMultilineSource: false,
+          rawResponse: result,
+        }
+      : undefined,
+  });
+}
+
+function readLegacyRuns() {
+  if (!hasStorage()) {
+    return [] as ReviewRunRecord[];
+  }
+
+  try {
+    const sessions = loadLegacySessions();
+    const results = loadLegacyResults();
+
+    return sessions.map((session) => mapLegacyRun(session, results[session.id]));
+  } catch {
+    return [];
+  }
 }
 
 function normalizeReviewStepMetricsState(metrics?: Partial<ReviewStepMetrics> | null) {
@@ -352,7 +589,16 @@ function readStoredRuns() {
   try {
     const raw = window.localStorage.getItem(REVIEW_RUNS_STORAGE_KEY);
     const parsed = raw ? (JSON.parse(raw) as Array<Partial<ReviewRunRecord>>) : [];
-    return parsed.map(normalizeReviewRun);
+    const merged = new Map<string, ReviewRunRecord>();
+
+    readLegacyRuns().forEach((run) => {
+      merged.set(run.id, run);
+    });
+    parsed.map(normalizeReviewRun).forEach((run) => {
+      merged.set(run.id, run);
+    });
+
+    return [...merged.values()];
   } catch {
     return [];
   }
@@ -421,7 +667,14 @@ export function listReviewRuns() {
 }
 
 export function getReviewRun(reviewRunId: string) {
-  return readStoredRuns().find((run) => run.id === reviewRunId) ?? null;
+  return (
+    readStoredRuns().find(
+      (run) =>
+        run.id === reviewRunId ||
+        run.submissionMetadata?.apiReviewId === reviewRunId ||
+        run.result?.backendReviewId === reviewRunId,
+    ) ?? null
+  );
 }
 
 export function getLatestReviewRun() {

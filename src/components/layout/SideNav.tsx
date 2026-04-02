@@ -10,7 +10,11 @@ export function SideNav() {
   const location = useLocation();
   const [isCreatingReview, setIsCreatingReview] = useState(false);
   const latestRunId = getLatestReviewRun()?.id;
-  const resultLink = latestRunId ? `/results/${latestRunId}` : "/workspace";
+  const resultLink = location.pathname.startsWith("/results/")
+    ? location.pathname
+    : latestRunId
+      ? `/results/${latestRunId}`
+      : "/workspace";
 
   const items = useMemo(
     () => [

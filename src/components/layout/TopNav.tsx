@@ -7,7 +7,11 @@ import { cn } from "@/utils/cn";
 export function TopNav() {
   const location = useLocation();
   const latestRunId = getLatestReviewRun()?.id;
-  const resultsLink = latestRunId ? `/results/${latestRunId}` : "/workspace";
+  const resultsLink = location.pathname.startsWith("/results/")
+    ? location.pathname
+    : latestRunId
+      ? `/results/${latestRunId}`
+      : "/workspace";
 
   const items = [
     { label: "Features", to: "/" },
