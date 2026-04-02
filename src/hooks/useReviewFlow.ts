@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useIssueFeedback } from "@/hooks/useIssueFeedback";
 import { useReviewResults } from "@/hooks/useReviewResults";
 import { useReviewSubmission } from "@/hooks/useReviewSubmission";
@@ -139,15 +139,20 @@ export function useReviewFlow({ reviewRunId, initialStep }: UseReviewFlowOptions
   const [snippets, setSnippets] = useState<ReviewSourceSnippetSummary[]>([]);
   const [isSnippetLoading, setIsSnippetLoading] = useState(false);
   const [snippetError, setSnippetError] = useState<string | null>(null);
+  const initializedRunIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!run) {
       return;
     }
 
-    const desiredStep = initialStep && initialStep > 1 && run.result ? initialStep : run.currentStep;
+    const shouldApplyInitialStep = initializedRunIdRef.current !== run.id;
+    initializedRunIdRef.current = run.id;
+
+    const desiredStep =
+      shouldApplyInitialStep && initialStep && initialStep > 1 && run.result ? initialStep : run.currentStep;
     setCurrentStep(desiredStep);
-  }, [initialStep, run]);
+  }, [initialStep, run?.currentStep, run?.id, run?.result]);
 
   useEffect(() => {
     if (!run) {

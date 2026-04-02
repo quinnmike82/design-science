@@ -34,6 +34,16 @@ function renderPage() {
   return { user };
 }
 
+function renderResultsFlow(reviewRunId: string) {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <ReviewFlowPage reviewRunId={reviewRunId} initialStep={2} />
+    </MemoryRouter>,
+  );
+  return { user };
+}
+
 function readStoredRuns() {
   return JSON.parse(window.localStorage.getItem(reviewRunsStorageKey) ?? "[]") as Array<Record<string, unknown>>;
 }
@@ -324,6 +334,106 @@ describe("ReviewFlowPage", () => {
     await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
 
     expect(screen.getByRole("heading", { name: "GitHub-like review detail" })).toBeInTheDocument();
+  });
+
+  it("keeps phase 3 open when a saved result is opened from the results flow", async () => {
+    window.localStorage.setItem(
+      reviewRunsStorageKey,
+      JSON.stringify([
+        {
+          id: "results-phase-run",
+          status: "completed",
+          createdAt: "2026-04-02T00:00:00.000Z",
+          updatedAt: "2026-04-02T00:01:00.000Z",
+          currentStep: 2,
+          stepMetrics: {
+            totalActiveSec: 75,
+            stepTimesSec: {
+              1: 30,
+              2: 45,
+              3: 0,
+            },
+          },
+          input: {
+            reviewMode: "multiple_agent",
+            selectedSnippetId: snippetId,
+            mainFiles: [
+              {
+                id: "results-main-1",
+                kind: "main",
+                name: `snippets/${snippetId}.py`,
+                content: snippetCode,
+                size: snippetCode.length,
+                uploadedAt: "2026-04-02T00:00:00.000Z",
+              },
+            ],
+            supportingFiles: [],
+            developerNotes: [],
+            notes: "",
+          },
+          result: {
+            reviewRunId: "results-phase-run",
+            mode: "multiple_agent",
+            transportMode: "api",
+            summaryText: "Saved results flow run",
+            issues: [
+              {
+                id: "results-issue-1",
+                title: "Unsafe dynamic evaluation detected",
+                severity: "critical",
+                roleName: "Security Agent",
+                filePath: `snippets/${snippetId}.py`,
+                lineNumber: 4,
+                locationLabel: `snippets/${snippetId}.py:4`,
+                description: "Stored result payload",
+                suggestion: "Use a safer parser instead of eval.",
+                originalSnippet: "result = eval('2 + 2')",
+                replacementSnippet: "safeEvaluate('2 + 2')",
+                sourceFileContent: snippetCode,
+                rationale: "Stored rationale",
+                canRenderRichDiff: false,
+                noteMatchStatus: "unknown",
+                relatedNoteIds: [],
+                relatedNoteTitles: [],
+                feedback: {
+                  comments: [],
+                  suggestedLineReports: [],
+                },
+                rawMetadata: {},
+              },
+            ],
+            noteComparison: {
+              totalNotes: 0,
+              matchedNotes: 0,
+              unmatchedNotes: 0,
+              agentMatchedIssues: 0,
+              agentOnlyIssues: 1,
+              notes: [],
+            },
+            severityCounts: {
+              critical: 1,
+              high: 0,
+              medium: 0,
+              low: 0,
+            },
+            submittedAt: "2026-04-02T00:01:00.000Z",
+            supportsMultilineSource: false,
+            rawResponse: {},
+          },
+        },
+      ]),
+    );
+
+    const { user } = renderResultsFlow("results-phase-run");
+
+    expect(await screen.findByRole("heading", { name: "Findings overview" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Continue to Marker Review Phase/i }));
+
+    expect(await screen.findByRole("heading", { name: "GitHub-like review detail" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Findings overview" })).not.toBeInTheDocument(),
+    );
   });
 
   it("shows the full-file diff fallback in step 3 when only line-level backend data is available", async () => {
