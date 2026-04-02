@@ -69,12 +69,12 @@ export function Step1InputSection({
       {snippetError ? <div className="text-sm text-error">{snippetError}</div> : null}
       {validationErrors.selectedSnippet ? <div className="text-sm text-error">A backend snippet is required.</div> : null}
 
-      <DeveloperReviewPanel
+      {/* <DeveloperReviewPanel
         snippet={input?.selectedSnippet}
         comments={input?.developerNotes ?? []}
         onAddComment={onAddDeveloperNote}
         onRemoveComment={onRemoveDeveloperNote}
-      />
+      /> */}
 
       <AdditionalDocsSection
         files={input?.supportingFiles ?? []}
